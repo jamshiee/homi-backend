@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Property } from './property.entity';
+import { AreaUnitEnum } from './building-detail.entity';
 
 @Entity('land_detail')
 export class LandDetail {
@@ -24,8 +25,8 @@ export class LandDetail {
   @Column({ name: 'total_area', type: 'decimal', precision: 10, scale: 3 })
   totalArea: string;
 
-  @Column({ name: 'area_unit', length: 20, default: 'cents' })
-  areaUnit: string;
+  @Column({ name: 'area_unit',  enum: AreaUnitEnum })
+  areaUnit: AreaUnitEnum;
 
 
 

@@ -45,6 +45,11 @@ export class PropertiesService {
       .andWhere('p.deletedAt IS NULL')
       .andWhere('(p.featuredUntil IS NULL OR p.featuredUntil > NOW())')
       .leftJoinAndSelect('p.propertyMedia', 'pm')
+      .leftJoinAndSelect('p.landDetail', 'land')
+      .leftJoinAndSelect('p.houseDetail', 'house')
+      .leftJoinAndSelect('p.buildingDetail', 'building')
+      .leftJoinAndSelect('p.hotelDetail', 'hotel')
+      .leftJoinAndSelect('p.lister', 'lister')
       .leftJoinAndSelect('pm.media', 'm')
       .orderBy('p.isFeatured', 'DESC')
       .addOrderBy('p.featuredOrder', 'ASC')
@@ -175,7 +180,7 @@ export class PropertiesService {
       property.slug = `${baseSlug}-${Date.now()}`;
 
       const savedProperty = await manager.save(Property, property);
-
+      
       if (dto.type === PropertyType.LAND) {
         if (!dto.landDetail) {
           throw new BadRequestException('Land detail fields are required.');
@@ -220,11 +225,9 @@ export class PropertiesService {
         const hotel = manager.create(HotelDetail, {
           propertyId: savedProperty.id,
           subType: dto.hotelDetail.subType,
-          roomsAvailable: dto.hotelDetail.roomsAvailable,
           roomType: dto.hotelDetail.roomType,
           occupancy: dto.hotelDetail.occupancy,
           mealsIncluded: dto.hotelDetail.mealsIncluded,
-          pricePerNight: dto.hotelDetail.pricePerNight ? dto.hotelDetail.pricePerNight.toString() : '0',
         });
         await manager.save(HotelDetail, hotel);
       }
@@ -274,6 +277,26 @@ export class PropertiesService {
     ip?: string,
     ua?: string,
   ) {
+    // 24-hour deduplication window
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const qb = this.enquiryRepo
+      .createQueryBuilder('el')
+      .where('el.propertyId = :propertyId', { propertyId })
+      .andWhere('el.enquiryType = :enquiryType', { enquiryType })
+      .andWhere('el.createdAt > :since', { since });
+
+    if (userId) {
+      qb.andWhere('el.userId = :userId', { userId });
+    } else if (ip) {
+      qb.andWhere('el.ipAddress = :ip', { ip });
+    }
+
+    const existing = await qb.getOne();
+    if (existing) {
+      this.logger.debug(`Duplicate enquiry skipped: ${enquiryType} on ${propertyId}`);
+      return;
+    }
+
     await this.enquiryRepo.save({
       propertyId,
       userId,
@@ -288,6 +311,55 @@ export class PropertiesService {
     };
     const col = counter[enquiryType];
     if (col) await this.propertyRepo.increment({ id: propertyId }, col, 1);
+  }
+
+  async findRelated(id: string): Promise<Property[]> {
+    const target = await this.propertyRepo.findOne({
+      where: { id, deletedAt: IsNull() },
+      select: ['id', 'district', 'type'],
+    });
+    if (!target) return [];
+
+    const { district, type } = target;
+
+return this.propertyRepo
+  .createQueryBuilder('p')
+  .where('p.status = :s', { s: PropertyStatus.ACTIVE })
+  .andWhere('p.deletedAt IS NULL')
+  .andWhere('p.id != :id', { id })
+  .andWhere('p.district = :district', { district })
+
+  .leftJoinAndSelect('p.propertyMedia', 'pm')
+  .leftJoinAndSelect('pm.media', 'm')
+
+  .leftJoinAndSelect('p.landDetail', 'ld')
+  .leftJoinAndSelect('p.houseDetail', 'hd')
+  .leftJoinAndSelect('p.buildingDetail', 'bd')
+  .leftJoinAndSelect('p.hotelDetail', 'hotd')
+
+  .addSelect(
+    `CASE WHEN p.type = :type THEN 0 ELSE 1 END`,
+    'type_priority',
+  )
+
+  .addSelect(
+  `
+  CASE
+    WHEN p.isFeatured = true THEN 0
+    ELSE 1
+  END
+  `,
+  'featured_priority',
+)
+
+  .setParameter('type', type)
+
+  .orderBy('featured_priority', 'ASC')
+.addOrderBy('type_priority', 'ASC')
+.addOrderBy('p.createdAt', 'DESC')
+
+  .take(5)
+  .getMany();
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)

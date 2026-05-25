@@ -10,11 +10,20 @@ import {
 import { Property } from './property.entity';
 
 export enum BuildingSubTypeEnum {
-  APARTMENT = 'apartment',
   OFFICE = 'office',
-  SHOP = 'shop',
   ROOM = 'room',
   WAREHOUSE = 'warehouse',
+}
+
+export enum BuildingStatusEnum{
+    READY_TO_MOVE = "ready_to_move",
+    UNDER_CONSTRUCTION = "under_construction",
+}
+
+export enum AreaUnitEnum {
+    SQFT = 'sqft',
+    CENT = 'cent',
+    ACRE = 'acre',
 }
 
 @Entity('building_detail')
@@ -35,19 +44,18 @@ export class BuildingDetail {
   @Column({ name: 'total_area', type: 'decimal', precision: 10, scale: 2 })
   totalArea: string;
 
-  @Column({ name: 'area_unit', length: 20, default: 'sqft' })
-  areaUnit: string;
+  @Column({ name: 'area_unit',  enum: AreaUnitEnum })
+  areaUnit: AreaUnitEnum;
 
   @Column({ name: 'floor_number', default: 0 })
   floorNumber: number;
 
   @Column({
     name: 'current_status',
-    type: 'varchar',
-    length: 32,
-    default: 'vacant',
+    type: 'enum',
+    enum: BuildingStatusEnum,
   })
-  currentStatus: string;
+  currentStatus: BuildingStatusEnum;
 
 
   @CreateDateColumn({ name: 'created_at' })

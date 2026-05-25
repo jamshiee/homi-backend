@@ -43,10 +43,8 @@ export class HouseDetail {
   hasKitchen: boolean;
 
 
-
-
-  @Column({ name: 'house_type', type: 'varchar', length: 32, default: 'independent' })
-  houseType: string;
+  // @Column({ name: 'house_type', type: 'varchar', length: 32, default: 'independent' })
+  // houseType: string;
 
   @Column({
     name: 'furnishing_status',

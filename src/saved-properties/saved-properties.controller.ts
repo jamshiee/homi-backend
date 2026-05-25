@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Param } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { User } from '../users/users.entity';
@@ -17,6 +17,23 @@ export class SavedPropertiesController {
       message: result.saved ? 'Property saved' : 'Property unsaved',
     };
   }
+
+@Get(':id/saved')
+async isSaved(
+  @Param('id') propertyId: string,
+  @CurrentUser() user: User,
+) {
+  const saved = await this.svc.isSaved(user.id, propertyId);
+
+  return {
+    data: {
+      saved,
+    },
+    message: saved
+      ? 'Property is saved'
+      : 'Property is not saved',
+  };
+}
 
   @Get('me')
   async getMySaved(@CurrentUser() user: User) {

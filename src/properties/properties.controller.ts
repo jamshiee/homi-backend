@@ -109,13 +109,13 @@ export class PropertiesController {
     };
   }
 
+  @Public()
   @Post(':id/enquiry')
-  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   async logEnquiry(
     @Param('id') id: string,
     @Body('enquiryType') type: EnquiryType,
-    @CurrentUser() user: User,
+    @CurrentUser() user: User | undefined,
     @Req() req: Request,
   ) {
     await this.svc.logEnquiry(
@@ -128,5 +128,14 @@ export class PropertiesController {
         : undefined,
     );
     return { data: null, message: 'Logged' };
+  }
+
+  @Public()
+  @Get(':id/related')
+  async getRelated(@Param('id') id: string) {
+    return {
+      data: await this.svc.findRelated(id),
+      message: 'Related properties',
+    };
   }
 }

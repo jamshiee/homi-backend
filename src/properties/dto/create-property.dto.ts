@@ -12,8 +12,8 @@ import {
 import { Type } from 'class-transformer';
 import { PropertyType, TransactionType, PriceUnit } from '../entities/property.entity';
 import { FurnishingStatusEnum } from '../entities/house-detail.entity';
-import { BuildingSubTypeEnum } from '../entities/building-detail.entity';
-import { HotelSubTypeEnum, RoomTypeEnum, OccupancyTypeEnum } from '../entities/hotel-detail.entity';
+import { AreaUnitEnum, BuildingStatusEnum, BuildingSubTypeEnum } from '../entities/building-detail.entity';
+import { HotelSubTypeEnum, RoomTypeEnum } from '../entities/hotel-detail.entity';
 
 export class LandDetailDto {
   @IsNotEmpty()
@@ -22,12 +22,8 @@ export class LandDetailDto {
   totalArea: number;
 
   @IsNotEmpty()
-  @IsString()
-  areaUnit: string;
-
-  @IsOptional()
-  @IsBoolean()
-  hasRoadAccess?: boolean;
+  @IsEnum(AreaUnitEnum)
+  areaUnit: AreaUnitEnum;
 }
 
 export class HouseDetailDto {
@@ -71,20 +67,16 @@ export class BuildingDetailDto {
   totalArea: number;
 
   @IsNotEmpty()
-  @IsString()
-  areaUnit: string;
+  @IsEnum(AreaUnitEnum)
+  areaUnit: AreaUnitEnum;
 
   @IsNotEmpty()
   @IsNumber()
   floorNumber: number;
 
   @IsNotEmpty()
-  @IsString()
-  currentStatus: string;
-
-  @IsOptional()
-  @IsBoolean()
-  hasRoadAccess?: boolean;
+  @IsEnum(BuildingStatusEnum)
+  currentStatus: BuildingStatusEnum;
 }
 
 export class HotelDetailDto {
@@ -92,27 +84,19 @@ export class HotelDetailDto {
   @IsEnum(HotelSubTypeEnum)
   subType: HotelSubTypeEnum;
 
-  @IsNotEmpty()
-  @IsNumber()
-  @Min(0)
-  roomsAvailable: number;
 
   @IsNotEmpty()
   @IsEnum(RoomTypeEnum)
   roomType: RoomTypeEnum;
 
   @IsNotEmpty()
-  @IsEnum(OccupancyTypeEnum)
-  occupancy: OccupancyTypeEnum;
+  @IsNumber()
+  occupancy: number;
 
   @IsNotEmpty()
   @IsBoolean()
   mealsIncluded: boolean;
 
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  pricePerNight?: number;
 }
 
 export class CreatePropertyDto {

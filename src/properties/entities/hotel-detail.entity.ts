@@ -9,23 +9,19 @@ import {
 } from 'typeorm';
 import { Property } from './property.entity';
 
-export enum HotelSubTypeEnum{
-  HOTEL="hotel",
-  PG="pg",
-  LODGE="lodge",
+export enum HotelSubTypeEnum {
+  HOTEL = "hotel",
+  PG = "pg",
+  LODGE = "lodge",
+  RESORT = "resort"
 }
 
-export enum RoomTypeEnum{
-  SINGLE="single",
-  DOUBLE="double",
-  FAMILY="family"
+export enum RoomTypeEnum {
+  SINGLE = "single",
+  DOUBLE = "double",
+  FAMILY = "family"
 }
 
-export enum OccupancyTypeEnum{
-  SINGLE="single",
-  DOUBLE="double",
-  FAMILY="family"
-}
 
 @Entity('hotel_detail')
 export class HotelDetail {
@@ -42,31 +38,25 @@ export class HotelDetail {
   @Column({ name: 'sub_type', type: 'enum', enum: HotelSubTypeEnum })
   subType: HotelSubTypeEnum;
 
-  @Column({ name: 'rooms_available', default: 1 })
-  roomsAvailable: number;
 
   @Column({
-     name: 'room_type',
-      type: 'enum',
-       enum:RoomTypeEnum,
-        default: RoomTypeEnum.SINGLE })
+    name: 'room_type',
+    type: 'enum',
+    enum: RoomTypeEnum,
+    default: RoomTypeEnum.SINGLE
+  })
   roomType: RoomTypeEnum;
 
   @Column({
-     name: 'occupancy',
-      type: 'enum',
-       enum:OccupancyTypeEnum,
-        default: OccupancyTypeEnum.SINGLE })
-  occupancy: OccupancyTypeEnum;
+    name: 'occupancy',
+    type: 'int',
+  })
+  occupancy: number;
 
   @Column({ name: 'meals_included', default: false })
   mealsIncluded: boolean;
 
-  @Column({ name: 'price_per_night', type: 'bigint', nullable: true })
-  pricePerNight: string;
-
-  @Column({ name: 'price_per_month', type: 'bigint', nullable: true })
-  pricePerMonth: string;
+  
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
