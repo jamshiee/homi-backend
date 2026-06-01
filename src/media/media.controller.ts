@@ -12,11 +12,12 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AdminGuard } from '../auth/guards/admin.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { User } from '../users/users.entity';
 import { MediaService } from './media.service';
 
 @Controller('media')
-@UseGuards(JwtAuthGuard, AdminGuard)
+@UseGuards(JwtAuthGuard)
 export class MediaController {
   constructor(private readonly svc: MediaService) {}
 
@@ -37,10 +38,12 @@ export class MediaController {
     @Param('propertyId') propertyId: string,
     @Body('isCover') isCover: string,
     @Body('sortOrder') sortOrder: string,
+    @CurrentUser() user: User,
   ) {
     const data = await this.svc.uploadPropertyPhoto(
       file,
       propertyId,
+      user.id,
       isCover === 'true',
       parseInt(sortOrder ?? '0', 10) || 0,
     );
@@ -48,8 +51,8 @@ export class MediaController {
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string) {
-    await this.svc.deletePropertyMedia(id);
+  async delete(@Param('id') id: string, @CurrentUser() user: User) {
+    await this.svc.deletePropertyMedia(id, user.id);
     return { data: null, message: 'Photo deleted' };
   }
 }

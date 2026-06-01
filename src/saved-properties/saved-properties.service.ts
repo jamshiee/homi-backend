@@ -1,19 +1,29 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SavedProperty } from './saved-property.entity';
+import { Property } from 'src/properties/entities/property.entity';
 
 @Injectable()
 export class SavedPropertiesService {
   constructor(
     @InjectRepository(SavedProperty)
     private readonly repo: Repository<SavedProperty>,
-  ) {}
+    @InjectRepository(Property)
+    private readonly propRepo: Repository<Property>,
+  ) { }
 
   async toggle(
     userId: string,
     propertyId: string,
   ): Promise<{ saved: boolean }> {
+
+
+    const property = await this.propRepo.findOne({ where: { id: propertyId } });
+    if (!property) {
+      throw new BadRequestException('Property not found');
+    }
+
     const existing = await this.repo.findOne({ where: { userId, propertyId } });
     if (existing) {
       await this.repo.delete(existing.id);
@@ -24,15 +34,32 @@ export class SavedPropertiesService {
   }
 
   async findByUser(userId: string) {
-    return this.repo.find({
+    const savedProperty = await this.repo.find({
       where: { userId },
       relations: [
         'property',
+        'property.lister',
+        'property.landDetail',
+        'property.houseDetail',
+        'property.buildingDetail',
+        'property.hotelDetail',
+        'property.propertyAmenities',
+        'property.propertyAmenities.amenity',
         'property.propertyMedia',
         'property.propertyMedia.media',
       ],
       order: { createdAt: 'DESC' },
     });
+
+    if (!savedProperty) {
+      return [];
+    }
+
+    const mappedData = savedProperty.map((saved) => {
+      return saved.property;
+    });
+
+    return mappedData;
   }
 
   async isSaved(userId: string, propertyId: string): Promise<boolean> {

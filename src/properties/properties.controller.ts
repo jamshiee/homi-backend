@@ -19,6 +19,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { User } from '../users/users.entity';
 import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
+import { UpdatePropertyDto } from './dto/update-property.dto';
 import { FilterPropertyDto } from './dto/filter-property.dto';
 import { EnquiryType } from '../enquiry-logs/enquiry-log.entity';
 import { PropertyStatus } from './entities/property.entity';
@@ -67,10 +68,14 @@ export class PropertiesController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  async update(@Param('id') id: string, @Body() dto: Record<string, unknown>) {
+  @UseGuards(JwtAuthGuard)
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdatePropertyDto,
+    @CurrentUser() user: User,
+  ) {
     return {
-      data: await this.svc.update(id, dto),
+      data: await this.svc.update(id, dto, user.id),
       message: 'Property updated',
     };
   }

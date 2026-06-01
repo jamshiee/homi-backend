@@ -1,17 +1,34 @@
-import { Injectable, NotFoundException, Logger, BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Property, PropertyStatus, PropertyType, TransactionType } from './entities/property.entity';
+import {
+  Property,
+  PropertyStatus,
+  PropertyType,
+  TransactionType,
+} from './entities/property.entity';
 import { FilterPropertyDto } from './dto/filter-property.dto';
 import { EnquiryLog, EnquiryType } from '../enquiry-logs/enquiry-log.entity';
 import { paginate, paginationMeta } from '../common/utils/pagination.util';
 import { CreatePropertyDto } from './dto/create-property.dto';
+import {
+  UpdatePropertyDto,
+  UpdatePropertyMediaSyncDto,
+} from './dto/update-property.dto';
 import { LandDetail } from './entities/land-detail.entity';
 import { HouseDetail } from './entities/house-detail.entity';
 import { BuildingDetail } from './entities/building-detail.entity';
 import { HotelDetail } from './entities/hotel-detail.entity';
 import { PropertyAmenity } from '../amenities/property-amenity.entity';
+import { PropertyMedia } from '../media/entities/property-media.entity';
+import { Media } from '../media/entities/media.entity';
 
 @Injectable()
 export class PropertiesService {
@@ -30,11 +47,13 @@ export class PropertiesService {
       .select('DISTINCT(p.district)', 'district')
       .where('p.status = :s', { s: PropertyStatus.ACTIVE })
       .andWhere('p.deletedAt IS NULL')
-      .andWhere('p.district IS NOT NULL AND p.district != :empty', { empty: '' })
+      .andWhere('p.district IS NOT NULL AND p.district != :empty', {
+        empty: '',
+      })
       .orderBy('district', 'ASC')
       .getRawMany();
 
-    return results.map(r => r.district);
+    return results.map((r) => r.district);
   }
 
   async findFeed(filters: FilterPropertyDto) {
@@ -55,17 +74,19 @@ export class PropertiesService {
       .addOrderBy('p.featuredOrder', 'ASC')
       .addOrderBy('p.createdAt', 'DESC');
 
-    if (filters.type)
-      qb.andWhere('p.type = :type', { type: filters.type });
-    if (filters.transactionType && filters.transactionType !== TransactionType.ALL)
+    if (filters.type) qb.andWhere('p.type = :type', { type: filters.type });
+    if (
+      filters.transactionType &&
+      filters.transactionType !== TransactionType.ALL
+    )
       qb.andWhere('p.transactionType = :tt', { tt: filters.transactionType });
     if (filters.district)
       qb.andWhere('p.district = :district', { district: filters.district });
-    
+
     if (filters.keyword) {
       qb.andWhere(
         '(p.locality ILIKE :kw OR p.district ILIKE :kw OR p.title ILIKE :kw OR p.description ILIKE :kw)',
-        { kw: `%${filters.keyword}%` }
+        { kw: `%${filters.keyword}%` },
       );
     }
 
@@ -74,39 +95,53 @@ export class PropertiesService {
     if (filters.maxPrice !== undefined)
       qb.andWhere('p.price <= :maxPrice', { maxPrice: filters.maxPrice });
 
-    // House Filters
     if (filters.type === PropertyType.HOUSE) {
       if (filters.bedrooms || filters.bathrooms || filters.furnishingStatus) {
         qb.leftJoin('p.houseDetail', 'hd');
-        if (filters.bedrooms) qb.andWhere('hd.bedrooms >= :bedrooms', { bedrooms: filters.bedrooms });
-        if (filters.bathrooms) qb.andWhere('hd.bathrooms >= :bathrooms', { bathrooms: filters.bathrooms });
-        if (filters.furnishingStatus) qb.andWhere('hd.furnishingStatus = :furnishingStatus', { furnishingStatus: filters.furnishingStatus });
+        if (filters.bedrooms)
+          qb.andWhere('hd.bedrooms >= :bedrooms', {
+            bedrooms: filters.bedrooms,
+          });
+        if (filters.bathrooms)
+          qb.andWhere('hd.bathrooms >= :bathrooms', {
+            bathrooms: filters.bathrooms,
+          });
+        if (filters.furnishingStatus)
+          qb.andWhere('hd.furnishingStatus = :furnishingStatus', {
+            furnishingStatus: filters.furnishingStatus,
+          });
       }
     }
 
-    // Land Filters
     if (filters.type === PropertyType.LAND) {
       if (filters.minArea || filters.maxArea || filters.areaUnit) {
         qb.leftJoin('p.landDetail', 'ld');
-        if (filters.minArea) qb.andWhere('ld.totalArea >= :minArea', { minArea: filters.minArea });
-        if (filters.maxArea) qb.andWhere('ld.totalArea <= :maxArea', { maxArea: filters.maxArea });
-        if (filters.areaUnit) qb.andWhere('ld.areaUnit = :areaUnit', { areaUnit: filters.areaUnit });
+        if (filters.minArea)
+          qb.andWhere('ld.totalArea >= :minArea', { minArea: filters.minArea });
+        if (filters.maxArea)
+          qb.andWhere('ld.totalArea <= :maxArea', { maxArea: filters.maxArea });
+        if (filters.areaUnit)
+          qb.andWhere('ld.areaUnit = :areaUnit', {
+            areaUnit: filters.areaUnit,
+          });
       }
     }
 
-    // Building Filters
     if (filters.type === PropertyType.BUILDING) {
       if (filters.buildingSubtype) {
         qb.leftJoin('p.buildingDetail', 'bd');
-        qb.andWhere('bd.propertySubtype = :subtype', { subtype: filters.buildingSubtype });
+        qb.andWhere('bd.propertySubtype = :subtype', {
+          subtype: filters.buildingSubtype,
+        });
       }
     }
 
-    // Hotel Filters
     if (filters.type === PropertyType.HOTEL) {
       if (filters.roomType) {
         qb.leftJoin('p.hotelDetail', 'hotd');
-        qb.andWhere('hotd.roomType = :roomType', { roomType: filters.roomType });
+        qb.andWhere('hotd.roomType = :roomType', {
+          roomType: filters.roomType,
+        });
       }
     }
 
@@ -148,8 +183,13 @@ export class PropertiesService {
   }
 
   async create(dto: CreatePropertyDto, listerId: string) {
-    if (dto.type === PropertyType.HOTEL && dto.transactionType !== TransactionType.RENT) {
-      throw new BadRequestException('Hotels/PG listings can only have Rent transaction type.');
+    if (
+      dto.type === PropertyType.HOTEL &&
+      dto.transactionType !== TransactionType.RENT
+    ) {
+      throw new BadRequestException(
+        'Hotels/PG listings can only have Rent transaction type.',
+      );
     }
     if (dto.price <= 0) {
       throw new BadRequestException('Price must be greater than zero.');
@@ -176,11 +216,14 @@ export class PropertiesService {
         status: PropertyStatus.ACTIVE,
       });
 
-      const baseSlug = dto.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      const baseSlug = dto.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '');
       property.slug = `${baseSlug}-${Date.now()}`;
 
       const savedProperty = await manager.save(Property, property);
-      
+
       if (dto.type === PropertyType.LAND) {
         if (!dto.landDetail) {
           throw new BadRequestException('Land detail fields are required.');
@@ -246,9 +289,67 @@ export class PropertiesService {
     });
   }
 
-  async update(id: string, dto: Record<string, unknown>) {
-    await this.propertyRepo.update(id, dto as Partial<Property>);
-    return this.findById(id);
+  async update(id: string, dto: UpdatePropertyDto, userId: string) {
+    const property = await this.assertPropertyOwner(id, userId);
+
+    if ('type' in dto && dto.type !== undefined && dto.type !== property.type) {
+      throw new BadRequestException('Property type cannot be changed.');
+    }
+
+    return this.propertyRepo.manager.transaction(async (manager) => {
+      const coreUpdate: Partial<Property> = {};
+      if (dto.title !== undefined) coreUpdate.title = dto.title;
+      if (dto.transactionType !== undefined)
+        coreUpdate.transactionType = dto.transactionType;
+      if (dto.district !== undefined) coreUpdate.district = dto.district;
+      if (dto.locality !== undefined) coreUpdate.locality = dto.locality;
+      if (dto.address !== undefined) coreUpdate.address = dto.address;
+      if (dto.latitude !== undefined) coreUpdate.latitude = dto.latitude;
+      if (dto.longitude !== undefined) coreUpdate.longitude = dto.longitude;
+      if (dto.price !== undefined) coreUpdate.price = dto.price;
+      if (dto.isNegotiable !== undefined)
+        coreUpdate.isNegotiable = dto.isNegotiable;
+      if (dto.advanceAmount !== undefined)
+        coreUpdate.advanceAmount = dto.advanceAmount;
+      if (dto.priceUnit !== undefined) coreUpdate.priceUnit = dto.priceUnit;
+      if (dto.description !== undefined)
+        coreUpdate.description = dto.description;
+      if (dto.contactPhone !== undefined)
+        coreUpdate.contactPhone = dto.contactPhone;
+      if (dto.alternatePhone !== undefined)
+        coreUpdate.alternatePhone = dto.alternatePhone;
+
+      if (Object.keys(coreUpdate).length > 0) {
+        await manager.update(Property, { id }, coreUpdate);
+      }
+
+      if (dto.landDetail !== undefined) {
+        await this.upsertLandDetail(manager, id, dto.landDetail);
+      }
+      if (dto.houseDetail !== undefined) {
+        await this.upsertHouseDetail(manager, id, dto.houseDetail);
+      }
+      if (dto.buildingDetail !== undefined) {
+        await this.upsertBuildingDetail(manager, id, dto.buildingDetail);
+      }
+      if (dto.hotelDetail !== undefined) {
+        await this.upsertHotelDetail(manager, id, dto.hotelDetail);
+      }
+      if (dto.amenityIds !== undefined) {
+        await manager.delete(PropertyAmenity, { propertyId: id });
+        if (dto.amenityIds.length > 0) {
+          await manager.save(
+            PropertyAmenity,
+            dto.amenityIds.map((amenityId) => ({ propertyId: id, amenityId })),
+          );
+        }
+      }
+      if (dto.mediaSync !== undefined) {
+        await this.syncMedia(manager, id, dto.mediaSync);
+      }
+
+      return this.findById(id);
+    });
   }
 
   async setStatus(id: string, status: PropertyStatus) {
@@ -277,7 +378,6 @@ export class PropertiesService {
     ip?: string,
     ua?: string,
   ) {
-    // 24-hour deduplication window
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const qb = this.enquiryRepo
       .createQueryBuilder('el')
@@ -293,7 +393,9 @@ export class PropertiesService {
 
     const existing = await qb.getOne();
     if (existing) {
-      this.logger.debug(`Duplicate enquiry skipped: ${enquiryType} on ${propertyId}`);
+      this.logger.debug(
+        `Duplicate enquiry skipped: ${enquiryType} on ${propertyId}`,
+      );
       return;
     }
 
@@ -304,6 +406,7 @@ export class PropertiesService {
       ipAddress: ip,
       userAgent: ua,
     });
+
     const counter: Partial<Record<EnquiryType, keyof Property>> = {
       [EnquiryType.VIEW]: 'viewCount',
       [EnquiryType.WHATSAPP]: 'whatsappTapCount',
@@ -322,44 +425,34 @@ export class PropertiesService {
 
     const { district, type } = target;
 
-return this.propertyRepo
-  .createQueryBuilder('p')
-  .where('p.status = :s', { s: PropertyStatus.ACTIVE })
-  .andWhere('p.deletedAt IS NULL')
-  .andWhere('p.id != :id', { id })
-  .andWhere('p.district = :district', { district })
-
-  .leftJoinAndSelect('p.propertyMedia', 'pm')
-  .leftJoinAndSelect('pm.media', 'm')
-
-  .leftJoinAndSelect('p.landDetail', 'ld')
-  .leftJoinAndSelect('p.houseDetail', 'hd')
-  .leftJoinAndSelect('p.buildingDetail', 'bd')
-  .leftJoinAndSelect('p.hotelDetail', 'hotd')
-
-  .addSelect(
-    `CASE WHEN p.type = :type THEN 0 ELSE 1 END`,
-    'type_priority',
-  )
-
-  .addSelect(
-  `
+    return this.propertyRepo
+      .createQueryBuilder('p')
+      .where('p.status = :s', { s: PropertyStatus.ACTIVE })
+      .andWhere('p.deletedAt IS NULL')
+      .andWhere('p.id != :id', { id })
+      .andWhere('p.district = :district', { district })
+      .leftJoinAndSelect('p.propertyMedia', 'pm')
+      .leftJoinAndSelect('pm.media', 'm')
+      .leftJoinAndSelect('p.landDetail', 'ld')
+      .leftJoinAndSelect('p.houseDetail', 'hd')
+      .leftJoinAndSelect('p.buildingDetail', 'bd')
+      .leftJoinAndSelect('p.hotelDetail', 'hotd')
+      .addSelect(`CASE WHEN p.type = :type THEN 0 ELSE 1 END`, 'type_priority')
+      .addSelect(
+        `
   CASE
     WHEN p.isFeatured = true THEN 0
     ELSE 1
   END
   `,
-  'featured_priority',
-)
-
-  .setParameter('type', type)
-
-  .orderBy('featured_priority', 'ASC')
-.addOrderBy('type_priority', 'ASC')
-.addOrderBy('p.createdAt', 'DESC')
-
-  .take(5)
-  .getMany();
+        'featured_priority',
+      )
+      .setParameter('type', type)
+      .orderBy('featured_priority', 'ASC')
+      .addOrderBy('type_priority', 'ASC')
+      .addOrderBy('p.createdAt', 'DESC')
+      .take(5)
+      .getMany();
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
@@ -372,5 +465,165 @@ return this.propertyRepo
       .andWhere('isFeatured = :t', { t: true })
       .execute();
     this.logger.log('Featured listing expiry complete');
+  }
+
+  private async assertPropertyOwner(id: string, userId: string) {
+    const property = await this.propertyRepo.findOne({
+      where: { id, deletedAt: IsNull() },
+      select: ['id', 'listedByUserId', 'type'],
+    });
+
+    if (!property) throw new NotFoundException('Property not found.');
+    if (property.listedByUserId !== userId) {
+      throw new ForbiddenException(
+        'Only listing owner can edit this property.',
+      );
+    }
+
+    return property;
+  }
+
+  private async upsertLandDetail(
+    manager: any,
+    propertyId: string,
+    detail: UpdatePropertyDto['landDetail'],
+  ) {
+    if (!detail) return;
+    const existing = await manager.findOne(LandDetail, {
+      where: { propertyId },
+    });
+    const payload = {
+      propertyId,
+      totalArea: detail.totalArea?.toString(),
+      areaUnit: detail.areaUnit,
+    };
+
+    if (existing) {
+      await manager.update(LandDetail, { id: existing.id }, payload);
+      return;
+    }
+
+    await manager.save(LandDetail, payload);
+  }
+
+  private async upsertHouseDetail(
+    manager: any,
+    propertyId: string,
+    detail: UpdatePropertyDto['houseDetail'],
+  ) {
+    if (!detail) return;
+    const existing = await manager.findOne(HouseDetail, {
+      where: { propertyId },
+    });
+    const payload = {
+      propertyId,
+      bedrooms: detail.bedrooms,
+      bathrooms: detail.bathrooms,
+      balconies: detail.balconies,
+      floors: detail.floors,
+      hasKitchen: detail.hasKitchen,
+      furnishingStatus: detail.furnishingStatus,
+    };
+
+    if (existing) {
+      await manager.update(HouseDetail, { id: existing.id }, payload);
+      return;
+    }
+
+    await manager.save(HouseDetail, payload);
+  }
+
+  private async upsertBuildingDetail(
+    manager: any,
+    propertyId: string,
+    detail: UpdatePropertyDto['buildingDetail'],
+  ) {
+    if (!detail) return;
+    const existing = await manager.findOne(BuildingDetail, {
+      where: { propertyId },
+    });
+    const payload = {
+      propertyId,
+      subType: detail.subType,
+      totalArea: detail.totalArea?.toString(),
+      areaUnit: detail.areaUnit,
+      floorNumber: detail.floorNumber,
+      currentStatus: detail.currentStatus,
+    };
+
+    if (existing) {
+      await manager.update(BuildingDetail, { id: existing.id }, payload);
+      return;
+    }
+
+    await manager.save(BuildingDetail, payload);
+  }
+
+  private async upsertHotelDetail(
+    manager: any,
+    propertyId: string,
+    detail: UpdatePropertyDto['hotelDetail'],
+  ) {
+    if (!detail) return;
+    const existing = await manager.findOne(HotelDetail, {
+      where: { propertyId },
+    });
+    const payload = {
+      propertyId,
+      subType: detail.subType,
+      roomType: detail.roomType,
+      occupancy: detail.occupancy,
+      mealsIncluded: detail.mealsIncluded,
+    };
+
+    if (existing) {
+      await manager.update(HotelDetail, { id: existing.id }, payload);
+      return;
+    }
+
+    await manager.save(HotelDetail, payload);
+  }
+
+  private async syncMedia(
+    manager: any,
+    propertyId: string,
+    mediaSync: UpdatePropertyMediaSyncDto,
+  ) {
+    const currentMedia = await manager.find(PropertyMedia, {
+      where: { propertyId },
+    });
+
+    if (mediaSync.removedPropertyMediaIds?.length) {
+      for (const propertyMediaId of mediaSync.removedPropertyMediaIds) {
+        const match = currentMedia.find(
+          (item: PropertyMedia) => item.id === propertyMediaId,
+        );
+        if (!match) continue;
+
+        await manager.delete(PropertyMedia, { id: propertyMediaId });
+        await manager.softDelete(Media, { id: match.mediaId });
+      }
+    }
+
+    if (mediaSync.coverPropertyMediaId) {
+      await manager.update(PropertyMedia, { propertyId }, { isCover: false });
+      await manager.update(
+        PropertyMedia,
+        { id: mediaSync.coverPropertyMediaId },
+        { isCover: true },
+      );
+    }
+
+    if (mediaSync.sortOrderByPropertyMediaId) {
+      for (const [propertyMediaId, sortOrder] of Object.entries(
+        mediaSync.sortOrderByPropertyMediaId,
+      )) {
+        await manager.update(
+          PropertyMedia,
+          { id: propertyMediaId },
+          { sortOrder },
+        );
+      }
+    }
   }
 }

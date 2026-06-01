@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -7,21 +11,32 @@ import * as fs from 'fs';
 import sharp from 'sharp';
 import { Media, MediaEntityType } from './entities/media.entity';
 import { PropertyMedia } from './entities/property-media.entity';
+import { Property } from '../properties/entities/property.entity';
 
 @Injectable()
 export class MediaService {
   constructor(
     @InjectRepository(Media) private readonly mediaRepo: Repository<Media>,
-    @InjectRepository(PropertyMedia) private readonly pmRepo: Repository<PropertyMedia>,
+    @InjectRepository(PropertyMedia)
+    private readonly pmRepo: Repository<PropertyMedia>,
+    @InjectRepository(Property)
+    private readonly propertyRepo: Repository<Property>,
     private readonly config: ConfigService,
   ) {}
 
   async uploadPropertyPhoto(
     file: Express.Multer.File,
     propertyId: string,
+    userId: string,
     isCover: boolean,
     sortOrder: number,
   ): Promise<PropertyMedia> {
+    await this.assertPropertyOwner(propertyId, userId);
+
+    if (isCover) {
+      await this.pmRepo.update({ propertyId }, { isCover: false });
+    }
+
     const media = await this.saveMedia(
       file,
       MediaEntityType.PROPERTY,
@@ -50,14 +65,33 @@ export class MediaService {
     });
   }
 
-  async deletePropertyMedia(id: string): Promise<void> {
+  async deletePropertyMedia(id: string, userId: string): Promise<void> {
     const pm = await this.pmRepo.findOne({
       where: { id },
       relations: ['media'],
     });
     if (!pm) return;
+
+    await this.assertPropertyOwner(pm.propertyId, userId);
     await this.pmRepo.delete(id);
     await this.mediaRepo.softDelete(pm.mediaId);
+  }
+
+  private async assertPropertyOwner(
+    propertyId: string,
+    userId: string,
+  ): Promise<void> {
+    const property = await this.propertyRepo.findOne({
+      where: { id: propertyId },
+      select: ['id', 'listedByUserId'],
+    });
+
+    if (!property) throw new NotFoundException('Property not found.');
+    if (property.listedByUserId !== userId) {
+      throw new ForbiddenException(
+        'Only listing owner can modify this property media.',
+      );
+    }
   }
 
   private async saveMedia(
@@ -82,9 +116,12 @@ export class MediaService {
 
         buffer = await pipeline.toBuffer();
         mimeType = 'image/jpeg';
-        
+
         const ext = path.extname(file.originalname);
-        const nameWithoutExt = file.originalname.slice(0, -ext.length || file.originalname.length);
+        const nameWithoutExt = file.originalname.slice(
+          0,
+          -ext.length || file.originalname.length,
+        );
         filename = `${nameWithoutExt}.jpg`;
       } catch (err) {
         // Fallback to original
@@ -102,7 +139,10 @@ export class MediaService {
     });
   }
 
-  private async saveLocally(buffer: Buffer, originalFilename: string): Promise<string> {
+  private async saveLocally(
+    buffer: Buffer,
+    originalFilename: string,
+  ): Promise<string> {
     const dir = path.join(process.cwd(), 'uploads');
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const filename = `${Date.now()}-${originalFilename.replace(/\s/g, '_')}`;
