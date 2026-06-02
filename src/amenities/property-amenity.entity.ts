@@ -6,6 +6,8 @@ import {
   JoinColumn,
   CreateDateColumn,
   Unique,
+  DeleteDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { Property } from '../properties/entities/property.entity';
 import { Amenity } from './amenity.entity';
@@ -35,4 +37,10 @@ export class PropertyAmenity {
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updateAt: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at' })
+  deletedAt: Date | null;
 }

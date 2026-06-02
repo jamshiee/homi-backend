@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -32,6 +33,15 @@ export class PropertiesController {
   @Get()
   getFeed(@Query() filters: FilterPropertyDto) {
     return this.svc.findFeed(filters);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async getMyListings(
+    @CurrentUser() user: User,
+    @Query() filters: FilterPropertyDto,
+  ) {
+    return this.svc.findByUser(user.id, filters);
   }
 
   @Public()
@@ -112,6 +122,13 @@ export class PropertiesController {
       ),
       message: 'Featured updated',
     };
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  async remove(@Param('id') id: string, @CurrentUser() user: User) {
+    await this.svc.remove(id, user.id);
+    return { data: null, message: 'Property deleted' };
   }
 
   @Public()

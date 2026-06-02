@@ -5,6 +5,8 @@ import {
   ManyToOne,
   JoinColumn,
   CreateDateColumn,
+  DeleteDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { Property } from '../../properties/entities/property.entity';
 import { Media } from './media.entity';
@@ -39,4 +41,10 @@ export class PropertyMedia {
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
+
+    @UpdateDateColumn({ name: 'updated_at' })
+    updateAt: Date;
+  
+    @DeleteDateColumn({ name: 'deleted_at' })
+    deletedAt: Date | null;
 }

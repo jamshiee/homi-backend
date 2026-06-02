@@ -6,6 +6,7 @@ import {
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
 } from 'typeorm';
 import { Property } from './property.entity';
 
@@ -57,6 +58,9 @@ export class HouseDetail {
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
+    @UpdateDateColumn({ name: 'updated_at' })
+    updateAt: Date;
+  
+    @DeleteDateColumn({ name: 'deleted_at' })
+    deletedAt: Date | null;
 }

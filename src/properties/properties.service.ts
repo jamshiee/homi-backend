@@ -29,6 +29,7 @@ import { HotelDetail } from './entities/hotel-detail.entity';
 import { PropertyAmenity } from '../amenities/property-amenity.entity';
 import { PropertyMedia } from '../media/entities/property-media.entity';
 import { Media } from '../media/entities/media.entity';
+import { SavedProperty } from '../saved-properties/saved-property.entity';
 
 @Injectable()
 export class PropertiesService {
@@ -144,6 +145,24 @@ export class PropertiesService {
         });
       }
     }
+
+    const total = await qb.getCount();
+    const data = await qb.skip(skip).take(limit).getMany();
+    return { data, meta: paginationMeta(total, page, limit) };
+  }
+
+  async findByUser(userId: string, filters: FilterPropertyDto) {
+    const { page, limit, skip } = paginate(filters);
+    const qb = this.propertyRepo
+      .createQueryBuilder('p')
+      .where('p.deletedAt IS NULL')
+      .andWhere('p.listedByUserId = :userId', { userId })
+      .leftJoinAndSelect('p.propertyMedia', 'pm')
+      .leftJoinAndSelect('pm.media', 'm')
+      .leftJoinAndSelect('p.lister', 'lister')
+      .orderBy('p.isFeatured', 'DESC')
+      .addOrderBy('p.featuredOrder', 'ASC')
+      .addOrderBy('p.createdAt', 'DESC');
 
     const total = await qb.getCount();
     const data = await qb.skip(skip).take(limit).getMany();
@@ -369,6 +388,42 @@ export class PropertiesService {
       featuredUntil: featuredUntil ?? null,
     } as never);
     return this.findById(id);
+  }
+
+  async remove(id: string, userId: string) {
+    const property = await this.assertPropertyOwner(id, userId);
+
+    return this.propertyRepo.manager.transaction(async (manager) => {
+      // Soft delete all property amenities
+      await manager.softDelete(PropertyAmenity, { propertyId: id });
+
+      // Soft delete all property media and their associated media objects
+      const propertyMediaRecords = await manager.find(PropertyMedia, {
+        where: { propertyId: id },
+      });
+
+      for (const pm of propertyMediaRecords) {
+        await manager.softDelete(PropertyMedia, { id: pm.id });
+        await manager.softDelete(Media, { id: pm.mediaId });
+      }
+
+      // Soft delete type-specific details based on property type
+      if (property.type === PropertyType.LAND) {
+        await manager.softDelete(LandDetail, { propertyId: id });
+      } else if (property.type === PropertyType.HOUSE) {
+        await manager.softDelete(HouseDetail, { propertyId: id });
+      } else if (property.type === PropertyType.BUILDING) {
+        await manager.softDelete(BuildingDetail, { propertyId: id });
+      } else if (property.type === PropertyType.HOTEL) {
+        await manager.softDelete(HotelDetail, { propertyId: id });
+      }
+
+      // Soft delete all saved properties (when users save this property)
+      await manager.softDelete(SavedProperty, { propertyId: id });
+
+      // Finally, soft delete the property itself
+      await manager.softDelete(Property, { id });
+    });
   }
 
   async logEnquiry(

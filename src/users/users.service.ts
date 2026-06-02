@@ -15,7 +15,10 @@ export class UsersService {
     phone: string,
     preferredLanguage?: string,
   ): Promise<{ user: User; isNew: boolean }> {
-    let user = await this.repo.findOne({ where: { phone } });
+    let user = await this.repo.findOne({
+      where: { phone },
+      relations: ['profileMedia'],
+    });
     if (user) {
       if (user.preferredLanguage !== preferredLanguage) {
         user = await this.repo.save({ ...user, preferredLanguage });
@@ -31,8 +34,17 @@ export class UsersService {
     return { user, isNew: true };
   }
 
-  async findById(id: string): Promise<User | null> {
-    return this.repo.findOne({ where: { id, isActive: true } });
+  async findById(id: string): Promise<User> {
+    const user = await this.repo.findOne({
+      where: { id, isActive: true },
+      relations: ['profileMedia'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
   }
 
   async updateLastLogin(id: string): Promise<void> {

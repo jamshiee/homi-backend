@@ -210,4 +210,5 @@ export class Property {
 
   @OneToMany(() => EnquiryLog, (l) => l.property)
   enquiryLogs: EnquiryLog[];
+
 }

@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   DeleteDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 
 export enum MediaEntityType {
@@ -37,6 +38,9 @@ export class Media {
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @DeleteDateColumn({ name: 'deleted_at' })
-  deletedAt: Date;
+    @UpdateDateColumn({ name: 'updated_at' })
+    updateAt: Date;
+  
+    @DeleteDateColumn({ name: 'deleted_at' })
+    deletedAt: Date | null;
 }

@@ -59,6 +59,7 @@ export class AuthController {
           name: result.user.name,
           preferredLanguage: result.user.preferredLanguage,
           profileMediaId: result.user.profileMediaId,
+          profileMediaUrl: result.user.profileMedia?.url ?? null,
           isAdmin: result.isAdmin,
         },
       },
