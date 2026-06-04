@@ -182,6 +182,52 @@ export class PropertiesService {
     });
   }
 
+  async findAdminFeatured() {
+    return this.propertyRepo.find({
+      where: {
+        isFeatured: true,
+        deletedAt: IsNull(),
+      },
+      order: { featuredOrder: 'ASC', createdAt: 'DESC' },
+      relations: ['propertyMedia', 'propertyMedia.media', 'lister'],
+    });
+  }
+
+  async findAdminAll(filters: FilterPropertyDto) {
+    const { page, limit, skip } = paginate(filters);
+    const qb = this.propertyRepo
+      .createQueryBuilder('p')
+      .where('p.deletedAt IS NULL')
+      .leftJoinAndSelect('p.propertyMedia', 'pm')
+      .leftJoinAndSelect('pm.media', 'm')
+      .leftJoinAndSelect('p.lister', 'lister')
+      .orderBy('p.createdAt', 'DESC');
+
+    if (filters.type) qb.andWhere('p.type = :type', { type: filters.type });
+    if (filters.status) qb.andWhere('p.status = :status', { status: filters.status });
+    if (filters.moderationStatus) qb.andWhere('p.moderationStatus = :ms', { ms: filters.moderationStatus });
+    if (filters.isFeatured !== undefined) qb.andWhere('p.isFeatured = :feat', { feat: filters.isFeatured });
+    if (
+      filters.transactionType &&
+      filters.transactionType !== TransactionType.ALL
+    ) {
+      qb.andWhere('p.transactionType = :tt', { tt: filters.transactionType });
+    }
+    if (filters.district) {
+      qb.andWhere('p.district = :district', { district: filters.district });
+    }
+    if (filters.keyword) {
+      qb.andWhere(
+        '(p.locality ILIKE :kw OR p.district ILIKE :kw OR p.title ILIKE :kw OR p.description ILIKE :kw)',
+        { kw: `%${filters.keyword}%` },
+      );
+    }
+
+    const total = await qb.getCount();
+    const data = await qb.skip(skip).take(limit).getMany();
+    return { data, meta: paginationMeta(total, page, limit) };
+  }
+
   async findById(id: string) {
     const p = await this.propertyRepo.findOne({
       where: { id, deletedAt: IsNull() },
@@ -379,15 +425,93 @@ export class PropertiesService {
   async setFeatured(
     id: string,
     isFeatured: boolean,
-    featuredOrder: number,
+    featuredOrder?: number,
     featuredUntil?: Date,
   ) {
-    await this.propertyRepo.update(id, {
-      isFeatured,
-      featuredOrder,
-      featuredUntil: featuredUntil ?? null,
-    } as never);
-    return this.findById(id);
+    return this.propertyRepo.manager.transaction(async (manager) => {
+      const property = await manager.findOne(Property, { where: { id } });
+      if (!property) throw new NotFoundException('Property not found');
+
+      let targetOrder = property.featuredOrder;
+
+      if (isFeatured) {
+        if (featuredOrder !== undefined && featuredOrder > 0) {
+          // Shift properties at or below this position down by 1
+          await manager
+            .createQueryBuilder()
+            .update(Property)
+            .set({ featuredOrder: () => 'featured_order + 1' })
+            .where('is_featured = true')
+            .andWhere('featured_order >= :target', { target: featuredOrder })
+            .execute();
+          targetOrder = featuredOrder;
+        } else if (!property.isFeatured) {
+          // If newly featured and no position given, append at the end
+          const maxOrderRes = await manager
+            .createQueryBuilder(Property, 'p')
+            .select('MAX(p.featuredOrder)', 'max')
+            .where('p.isFeatured = true')
+            .getRawOne();
+          targetOrder = (maxOrderRes?.max || 0) + 1;
+        }
+      } else {
+        // Unfeatured properties get reset
+        targetOrder = 0;
+      }
+
+      await manager.update(Property, id, {
+        isFeatured,
+        featuredOrder: targetOrder,
+        featuredUntil: featuredUntil ?? null,
+      } as never);
+
+      await this.resequenceFeaturedProperties(manager);
+
+      return manager.findOne(Property, {
+        where: { id },
+        relations: ['propertyMedia', 'propertyMedia.media', 'lister'],
+      });
+    });
+  }
+
+  async reorderFeatured(id: string, direction: 'up' | 'down') {
+    return this.propertyRepo.manager.transaction(async (manager) => {
+      const property = await manager.findOne(Property, { where: { id } });
+      if (!property || !property.isFeatured) {
+        throw new BadRequestException('Property is not featured');
+      }
+
+      const currentOrder = property.featuredOrder;
+      
+      let swapProperty: Property | null = null;
+      if (direction === 'up') {
+        swapProperty = await manager
+          .createQueryBuilder(Property, 'p')
+          .where('p.isFeatured = true')
+          .andWhere('p.featuredOrder < :currentOrder', { currentOrder })
+          .orderBy('p.featuredOrder', 'DESC')
+          .getOne();
+      } else {
+        swapProperty = await manager
+          .createQueryBuilder(Property, 'p')
+          .where('p.isFeatured = true')
+          .andWhere('p.featuredOrder > :currentOrder', { currentOrder })
+          .orderBy('p.featuredOrder', 'ASC')
+          .getOne();
+      }
+
+      if (!swapProperty) return property;
+
+      const swapOrder = swapProperty.featuredOrder;
+
+      await manager.update(Property, id, { featuredOrder: swapOrder });
+      await manager.update(Property, swapProperty.id, { featuredOrder: currentOrder });
+
+      return manager.findOne(Property, {
+        where: { id },
+        relations: ['propertyMedia', 'propertyMedia.media', 'lister'],
+      });
+    });
   }
 
   async remove(id: string, userId: string) {
@@ -423,6 +547,10 @@ export class PropertiesService {
 
       // Finally, soft delete the property itself
       await manager.softDelete(Property, { id });
+
+      if (property.isFeatured) {
+        await this.resequenceFeaturedProperties(manager);
+      }
     });
   }
 
@@ -512,20 +640,31 @@ export class PropertiesService {
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async expireFeaturedListings() {
-    await this.propertyRepo
-      .createQueryBuilder()
-      .update(Property)
-      .set({ isFeatured: false })
-      .where('featuredUntil < NOW()')
-      .andWhere('isFeatured = :t', { t: true })
-      .execute();
+    await this.propertyRepo.manager.transaction(async (manager) => {
+      const expiredProps = await manager
+        .createQueryBuilder(Property, 'p')
+        .where('p.featuredUntil < NOW()')
+        .andWhere('p.isFeatured = :t', { t: true })
+        .getMany();
+
+      if (expiredProps.length === 0) return;
+
+      await manager
+        .createQueryBuilder()
+        .update(Property)
+        .set({ isFeatured: false, featuredOrder: 0 })
+        .whereInIds(expiredProps.map((p) => p.id))
+        .execute();
+
+      await this.resequenceFeaturedProperties(manager);
+    });
     this.logger.log('Featured listing expiry complete');
   }
 
   private async assertPropertyOwner(id: string, userId: string) {
     const property = await this.propertyRepo.findOne({
       where: { id, deletedAt: IsNull() },
-      select: ['id', 'listedByUserId', 'type'],
+      select: ['id', 'listedByUserId', 'type', 'isFeatured', 'featuredOrder'],
     });
 
     if (!property) throw new NotFoundException('Property not found.');
@@ -536,6 +675,20 @@ export class PropertiesService {
     }
 
     return property;
+  }
+
+  private async resequenceFeaturedProperties(manager?: any) {
+    const mgr = manager || this.propertyRepo.manager;
+    const remainingProps = await mgr.find(Property, {
+      where: { isFeatured: true, deletedAt: IsNull() },
+      order: { featuredOrder: 'ASC' },
+    });
+
+    for (let i = 0; i < remainingProps.length; i++) {
+      if (remainingProps[i].featuredOrder !== i + 1) {
+        await mgr.update(Property, remainingProps[i].id, { featuredOrder: i + 1 });
+      }
+    }
   }
 
   private async upsertLandDetail(

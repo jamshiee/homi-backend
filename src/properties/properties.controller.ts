@@ -53,6 +53,29 @@ export class PropertiesController {
     };
   }
 
+  // ==========================================
+  // ADMIN FEATURED PROPERTIES MODULE ENDPOINTS
+  // ==========================================
+
+  @Get('admin/featured')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async getAdminFeatured() {
+    return {
+      data: await this.svc.findAdminFeatured(),
+      message: 'All featured properties fetched for admin',
+    };
+  }
+
+  @Get('admin/all')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async getAdminAllProperties(@Query() filters: FilterPropertyDto) {
+    return this.svc.findAdminAll(filters);
+  }
+
+  // ==========================================
+  // PUBLIC & USER ENDPOINTS
+  // ==========================================
+
   @Public()
   @Get('featured')
   async getFeatured() {
@@ -102,6 +125,8 @@ export class PropertiesController {
     };
   }
 
+  // --- Admin Featured Module Actions ---
+
   @Patch(':id/feature')
   @UseGuards(JwtAuthGuard, AdminGuard)
   async setFeatured(
@@ -109,7 +134,7 @@ export class PropertiesController {
     @Body()
     body: {
       isFeatured: boolean;
-      featuredOrder: number;
+      featuredOrder?: number;
       featuredUntil?: string;
     },
   ) {
@@ -121,6 +146,18 @@ export class PropertiesController {
         body.featuredUntil ? new Date(body.featuredUntil) : undefined,
       ),
       message: 'Featured updated',
+    };
+  }
+
+  @Patch(':id/reorder')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async reorderFeatured(
+    @Param('id') id: string,
+    @Body('direction') direction: 'up' | 'down',
+  ) {
+    return {
+      data: await this.svc.reorderFeatured(id, direction),
+      message: 'Property reordered',
     };
   }
 

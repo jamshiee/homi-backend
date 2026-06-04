@@ -1,7 +1,8 @@
 import { IsOptional, IsEnum, IsString, IsInt, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
-import {  PropertyType, TransactionType } from '../entities/property.entity';
+import { PropertyType, TransactionType, PropertyStatus, ModerationStatus } from '../entities/property.entity';
 import { FurnishingStatusEnum } from '../entities/house-detail.entity';
+import { Transform } from 'class-transformer';
 
 export class FilterPropertyDto {
   @IsOptional()
@@ -15,6 +16,22 @@ export class FilterPropertyDto {
   @IsOptional()
   @IsString()
   district?: string;
+
+  @IsOptional()
+  @IsEnum(PropertyStatus)
+  status?: PropertyStatus;
+
+  @IsOptional()
+  @IsEnum(ModerationStatus)
+  moderationStatus?: ModerationStatus;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  isFeatured?: boolean;
 
   @IsOptional()
   @IsString()

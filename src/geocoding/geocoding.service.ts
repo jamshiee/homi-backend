@@ -19,6 +19,35 @@ export class GeocodingService {
 
   private readonly USER_AGENT = 'HomiHoldings/1.0 (contact@homiholdings.com)';
 
+  private normalizeDistrict(name: string): string {
+    let cleaned = name.replace(/\s+district/gi, '').trim();
+    const lower = cleaned.toLowerCase();
+    
+    // Map common misspellings or alternative names to standard Expo names
+    const mapping: Record<string, string> = {
+      'kasargod': 'Kasaragod',
+      'kasaragod': 'Kasaragod',
+      'trivandrum': 'Thiruvananthapuram',
+      'thiruvananthapuram': 'Thiruvananthapuram',
+      'calicut': 'Kozhikode',
+      'kozhikode': 'Kozhikode',
+      'cochin': 'Ernakulam',
+      'ernakulam': 'Ernakulam',
+      'palghat': 'Palakkad',
+      'palakkad': 'Palakkad',
+      'cannanore': 'Kannur',
+      'kannur': 'Kannur',
+      'trichur': 'Thrissur',
+      'thrissur': 'Thrissur',
+      'alleppey': 'Alappuzha',
+      'alappuzha': 'Alappuzha',
+      'quilon': 'Kollam',
+      'kollam': 'Kollam',
+    };
+    
+    return mapping[lower] || cleaned;
+  }
+
   async search(query: string): Promise<GeocodingResult[]> {
     const cleanQuery = query?.trim().toLowerCase();
     if (!cleanQuery) return [];
@@ -74,9 +103,9 @@ export class GeocodingService {
           address.locality ||
           '';
 
-        let district = address.state_district || address.district || address.county || '';
-        // Standardize: "Malappuram District" -> "Malappuram", "Kozhikode District" -> "Kozhikode", etc.
-        district = district.replace(/\s+district/gi, '').trim();
+        let rawDistrict = address.state_district || address.district || address.county || '';
+        // Standardize names (e.g. Kasargod -> Kasaragod, Malappuram District -> Malappuram)
+        const district = this.normalizeDistrict(rawDistrict);
 
         results.push({
           locality,
@@ -142,8 +171,8 @@ export class GeocodingService {
         address.locality ||
         '';
 
-      let district = address.state_district || address.district || address.county || '';
-      district = district.replace(/\s+district/gi, '').trim();
+      let rawDistrict = address.state_district || address.district || address.county || '';
+      const district = this.normalizeDistrict(rawDistrict);
 
       const result: GeocodingResult = {
         locality,
