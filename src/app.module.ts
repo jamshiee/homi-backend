@@ -24,12 +24,17 @@ import { GeocodingModule } from './geocoding/geocoding.module';
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        type: 'postgres' as const,
+        type: 'postgres',
         host: config.get<string>('database.host'),
         port: config.get<number>('database.port'),
         username: config.get<string>('database.username'),
         password: config.get<string>('database.password'),
         database: config.get<string>('database.name'),
+
+        ssl: {
+          rejectUnauthorized: false,
+        },
+
         autoLoadEntities: true,
         synchronize: config.get<string>('nodeEnv') === 'development',
         logging: config.get<string>('nodeEnv') === 'development',
