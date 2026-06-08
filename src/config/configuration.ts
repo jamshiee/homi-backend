@@ -7,6 +7,7 @@ export default () => ({
     username: process.env.DB_USER,
     password: process.env.DB_PASS,
     name: process.env.DB_NAME,
+    ssl: process.env.SSL_ALLOWED === 'true',
   },
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET,

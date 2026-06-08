@@ -11,9 +11,11 @@ export const AppDataSource = new DataSource({
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
 
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  ssl: process.env.SSL_ALLOWED === 'true'
+    ? {
+        rejectUnauthorized: false,
+      }
+    : false,
 
   entities: ['src/**/*.entity.ts'],
   migrations: ['src/database/migrations/*.ts'],

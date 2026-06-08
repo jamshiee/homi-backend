@@ -31,9 +31,11 @@ import { GeocodingModule } from './geocoding/geocoding.module';
         password: config.get<string>('database.password'),
         database: config.get<string>('database.name'),
 
-        ssl: {
-          rejectUnauthorized: false,
-        },
+        ssl: config.get<boolean>('database.ssl')
+          ? {
+              rejectUnauthorized: false,
+            }
+          : false,
 
         autoLoadEntities: true,
         synchronize: config.get<string>('nodeEnv') === 'development',
