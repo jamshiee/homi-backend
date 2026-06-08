@@ -41,4 +41,8 @@ export default () => ({
     maxFileSizeBytes:
       parseInt(process.env.MAX_FILE_SIZE_BYTES ?? '10485760', 10) || 10485760,
   },
+  ai: {
+    provider: process.env.AI_PROVIDER || 'gemini',
+    geminiApiKey: process.env.GEMINI_API_KEY,
+  },
 });

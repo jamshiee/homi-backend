@@ -15,6 +15,7 @@ import { MediaModule } from './media/media.module';
 import { SavedPropertiesModule } from './saved-properties/saved-properties.module';
 import { EnquiryLogsModule } from './enquiry-logs/enquiry-logs.module';
 import { GeocodingModule } from './geocoding/geocoding.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { GeocodingModule } from './geocoding/geocoding.module';
     SavedPropertiesModule,
     EnquiryLogsModule,
     GeocodingModule,
+    AiModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
