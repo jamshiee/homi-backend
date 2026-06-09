@@ -272,6 +272,7 @@ export class PropertiesService {
         longitude: dto.longitude,
         price: dto.price,
         isNegotiable: dto.isNegotiable ?? false,
+        isVerified: dto.isVerified ?? false,
         advanceAmount: dto.advanceAmount,
         priceUnit: dto.priceUnit,
         description: dto.description,
@@ -374,6 +375,8 @@ export class PropertiesService {
       if (dto.price !== undefined) coreUpdate.price = dto.price;
       if (dto.isNegotiable !== undefined)
         coreUpdate.isNegotiable = dto.isNegotiable;
+      if (dto.isVerified !== undefined)
+        coreUpdate.isVerified = dto.isVerified;
       if (dto.advanceAmount !== undefined)
         coreUpdate.advanceAmount = dto.advanceAmount;
       if (dto.priceUnit !== undefined) coreUpdate.priceUnit = dto.priceUnit;

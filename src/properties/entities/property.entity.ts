@@ -114,6 +114,9 @@ export class Property {
   @Column({ name: 'is_negotiable', default: false })
   isNegotiable: boolean;
 
+  @Column({ name: 'is_verified', default: false })
+  isVerified: boolean;
+
   @Column({ name: 'advance_amount', nullable: true, type: 'bigint' })
   advanceAmount: number;
 

@@ -166,6 +166,10 @@ export class UpdatePropertyDto {
   isNegotiable?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  isVerified?: boolean;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   advanceAmount?: number;
