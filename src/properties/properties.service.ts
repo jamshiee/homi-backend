@@ -241,6 +241,7 @@ export class PropertiesService {
         'propertyMedia',
         'propertyMedia.media',
         'lister',
+        'lister.profileMedia',
       ],
     });
     if (!p) throw new NotFoundException('Property not found.');
