@@ -55,11 +55,10 @@ export class SavedPropertiesService {
       return [];
     }
 
-    const mappedData = savedProperty.map((saved) => {
-      return saved.property;
-    });
-
-    return mappedData;
+    return savedProperty.map(({ property }) => ({
+      ...property,
+      isSaved: true,
+    }));
   }
 
   async isSaved(userId: string, propertyId: string): Promise<boolean> {

@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   Property,
@@ -40,7 +40,37 @@ export class PropertiesService {
     private readonly propertyRepo: Repository<Property>,
     @InjectRepository(EnquiryLog)
     private readonly enquiryRepo: Repository<EnquiryLog>,
+    @InjectRepository(SavedProperty)
+    private readonly savedRepo: Repository<SavedProperty>,
   ) {}
+
+  /**
+   * Given a list of property IDs and an optional userId, returns a Set
+   * of property IDs that the user has saved. Used to annotate feed/featured
+   * results without N+1 queries.
+   */
+  private async getSavedSet(
+    propertyIds: string[],
+    userId?: string | null,
+  ): Promise<Set<string>> {
+    if (!userId || propertyIds.length === 0) return new Set();
+    const rows = await this.savedRepo.find({
+      where: { userId, propertyId: In(propertyIds) },
+      select: ['propertyId'],
+    });
+    return new Set(rows.map((r) => r.propertyId));
+  }
+
+  /** Annotate an array of Property objects with isSaved boolean. */
+  private annotateWithSaved<T extends Property>(
+    items: T[],
+    savedSet: Set<string>,
+  ): (T & { isSaved: boolean })[] {
+    return items.map((p) => ({
+      ...p,
+      isSaved: savedSet.has(p.id),
+    })) as (T & { isSaved: boolean })[];
+  }
 
   async getDistinctDistricts(): Promise<string[]> {
     const results = await this.propertyRepo
@@ -57,7 +87,7 @@ export class PropertiesService {
     return results.map((r) => r.district);
   }
 
-  async findFeed(filters: FilterPropertyDto) {
+  async findFeed(filters: FilterPropertyDto, userId?: string | null) {
     const { page, limit, skip } = paginate(filters);
     const qb = this.propertyRepo
       .createQueryBuilder('p')
@@ -149,7 +179,8 @@ export class PropertiesService {
 
     const total = await qb.getCount();
     const data = await qb.skip(skip).take(limit).getMany();
-    return { data, meta: paginationMeta(total, page, limit) };
+    const savedSet = await this.getSavedSet(data.map((p) => p.id), userId);
+    return { data: this.annotateWithSaved(data, savedSet), meta: paginationMeta(total, page, limit) };
   }
 
   async findByUser(userId: string, filters: FilterPropertyDto) {
@@ -170,8 +201,8 @@ export class PropertiesService {
     return { data, meta: paginationMeta(total, page, limit) };
   }
 
-  async findFeatured() {
-    return this.propertyRepo.find({
+  async findFeatured(userId?: string | null) {
+    const items = await this.propertyRepo.find({
       where: {
         status: PropertyStatus.ACTIVE,
         isFeatured: true,
@@ -179,8 +210,10 @@ export class PropertiesService {
       },
       order: { featuredOrder: 'ASC', createdAt: 'DESC' },
       take: 10,
-      relations: ['propertyMedia', 'propertyMedia.media'],
+      relations: ['propertyMedia', 'propertyMedia.media', 'lister', 'lister.profileMedia'],
     });
+    const savedSet = await this.getSavedSet(items.map((p) => p.id), userId);
+    return this.annotateWithSaved(items, savedSet);
   }
 
   async findAdminFeatured() {

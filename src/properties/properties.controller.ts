@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -29,10 +30,13 @@ import { PropertyStatus } from './entities/property.entity';
 export class PropertiesController {
   constructor(private readonly svc: PropertiesService) {}
 
-  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get()
-  getFeed(@Query() filters: FilterPropertyDto) {
-    return this.svc.findFeed(filters);
+  getFeed(
+    @Query() filters: FilterPropertyDto,
+    @CurrentUser() user: User | null,
+  ) {
+    return this.svc.findFeed(filters, user?.id ?? null);
   }
 
   @Get('me')
@@ -76,11 +80,11 @@ export class PropertiesController {
   // PUBLIC & USER ENDPOINTS
   // ==========================================
 
-  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('featured')
-  async getFeatured() {
+  async getFeatured(@CurrentUser() user: User | null) {
     return {
-      data: await this.svc.findFeatured(),
+      data: await this.svc.findFeatured(user?.id ?? null),
       message: 'Featured properties',
     };
   }
