@@ -70,6 +70,7 @@ export class PropertiesService {
       .leftJoinAndSelect('p.buildingDetail', 'building')
       .leftJoinAndSelect('p.hotelDetail', 'hotel')
       .leftJoinAndSelect('p.lister', 'lister')
+      .leftJoinAndSelect('lister.profileMedia', 'listerMedia')
       .leftJoinAndSelect('pm.media', 'm')
       .orderBy('p.isFeatured', 'DESC')
       .addOrderBy('p.featuredOrder', 'ASC')
