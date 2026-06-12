@@ -85,4 +85,41 @@ export class OtpService {
       throw new Error('Failed to send OTP via SMS');
     }
   }
+
+  /**
+   * Validates the accessToken MSG91 returns after user verifies OTP on device.
+   * Returns the verified mobile number on success.
+   */
+async verifyMsg91AccessToken(accessToken: string): Promise<string> {
+  const authKey = this.config.get<string>('msg91.authKey');
+  try {
+    const response = await axios.post(          // ← GET → POST
+      'https://api.msg91.com/api/v5/widget/verifyAccessToken',
+      { "access-token": accessToken },            // ← body, not params
+      {
+        headers: { authkey: authKey },
+        timeout: 5000,
+      },
+    );
+
+    this.logger.log('MSG91 token verify response: ' + JSON.stringify(response.data));
+
+    if (response.data?.type !== 'success') {
+      throw new Error('MSG91 token invalid');
+    }
+
+    return response.data.message as string;
+  } catch (err: unknown) {
+    const ax = err as { response?: { data?: unknown; status?: number }; message?: string };
+    this.logger.error('MSG91 verify failed — status: ' + ax?.response?.status);
+    this.logger.error('MSG91 verify failed — data: ' + JSON.stringify(ax?.response?.data));
+    this.logger.error('MSG91 verify failed — message: ' + ax?.message);
+    throw new Error('OTP verification failed');
+  }
+}
+
+  // Keep this for terminal/dev testing only
+  isTerminalTest(): boolean {
+    return this.config.get<boolean>('otp.terminalTest') ?? false;
+  }
 }

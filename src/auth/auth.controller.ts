@@ -35,37 +35,40 @@ export class AuthController {
     return { data: result, message: `OTP sent via ${result.channel}` };
   }
 
-  @Public()
-  @Post('verify-otp')
-  @HttpCode(HttpStatus.OK)
-  async verifyOtp(@Body() dto: VerifyOtpDto, @Req() req: Request) {
-    const result = await this.authService.verifyOtp(
-      dto.phone,
-      dto.otp,
-      dto.preferredLanguage,
-      typeof req.headers['user-agent'] === 'string'
-        ? req.headers['user-agent']
-        : undefined,
-      req.ip,
-    );
-    return {
-      data: {
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-        isNewUser: result.isNewUser,
-        user: {
-          id: result.user.id,
-          phone: result.user.phone,
-          name: result.user.name,
-          preferredLanguage: result.user.preferredLanguage,
-          profileMediaId: result.user.profileMediaId,
-          profileMediaUrl: result.user.profileMedia?.url ?? null,
-          isAdmin: result.isAdmin,
-        },
+// Change the verify-otp endpoint only
+
+@Public()
+@Post('verify-otp')
+@HttpCode(HttpStatus.OK)
+async verifyOtp(@Body() dto: VerifyOtpDto, @Req() req: Request) {
+  const result = await this.authService.verifyOtp(
+    dto.accessToken,              // ← was dto.phone + dto.otp
+    dto.preferredLanguage,
+    typeof req.headers['user-agent'] === 'string'
+      ? req.headers['user-agent']
+      : undefined,
+    req.ip,
+  );
+  return {
+    data: {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      isNewUser: result.isNewUser,
+      user: {
+        id: result.user.id,
+        phone: result.user.phone,
+        name: result.user.name,
+        preferredLanguage: result.user.preferredLanguage,
+        profileMediaId: result.user.profileMediaId,
+        profileMediaUrl: result.user.profileMedia?.url ?? null,
+        isAdmin: result.isAdmin,
       },
-      message: result.isNewUser ? 'Account created' : 'Login successful',
-    };
-  }
+    },
+    message: result.isNewUser ? 'Account created' : 'Login successful',
+  };
+}
+
+// send-otp endpoint can be REMOVED entirely — MSG91 SDK handles sending
 
   @Public()
   @Post('refresh')

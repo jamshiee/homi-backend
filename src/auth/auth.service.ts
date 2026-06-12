@@ -68,54 +68,38 @@ export class AuthService {
     };
   }
 
-  async verifyOtp(
-    phone: string,
-    code: string,
-    preferredLanguage?: string,
-    deviceInfo?: string,
-    ip?: string,
-  ) {
-    const record = await this.otpRepo.findOne({
-      where: { phone, status: OtpStatus.PENDING },
-      order: { createdAt: 'DESC' },
-    });
+// In auth.service.ts — replace verifyOtp() only
 
-    if (!record)
-      throw new BadRequestException('No pending OTP. Request a new one.');
-    if (new Date() > record.expiresAt) {
-      await this.otpRepo.update(record.id, { status: OtpStatus.EXPIRED });
-      throw new BadRequestException('OTP expired. Request a new one.');
-    }
+async verifyOtp(
+  accessToken: string,             // ← now receives MSG91 accessToken, not raw OTP
+  preferredLanguage?: string,
+  deviceInfo?: string,
+  ip?: string,
+) {
+  // DEV MODE: skip MSG91, use phone directly for testing
+  let verifiedPhone: string;
 
-    const max = this.config.get<number>('otp.maxAttempts')!;
-    if (record.attemptCount >= max) {
-      await this.otpRepo.update(record.id, { status: OtpStatus.FAILED });
-      throw new HttpException(
-        'Too many attempts. Request a new OTP.',
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
-
-    if (!(await this.otpService.verify(code, record.otpHash))) {
-      await this.otpRepo.increment({ id: record.id }, 'attemptCount', 1);
-      throw new BadRequestException(
-        `Invalid OTP. ${max - (record.attemptCount + 1)} attempt(s) remaining.`,
-      );
-    }
-
-    await this.otpRepo.update(record.id, {
-      status: OtpStatus.VERIFIED,
-      verifiedAt: new Date(),
-    });
-
-    const { user, isNew } = await this.usersService.findOrCreate(phone, preferredLanguage);
-    await this.usersService.updateLastLogin(user.id);
-    const tokens = await this.issueTokens(user, deviceInfo, ip);
-    const admins = this.config.get<string[]>('admin.numbers') ?? [];
-    const isAdmin = admins.includes(phone);
-
-    return { ...tokens, user, isNewUser: isNew, isAdmin };
+  if (this.otpService.isTerminalTest()) {
+    // In dev, accessToken field carries the raw phone for bypass
+    verifiedPhone = accessToken;
+    this.logger.log(`[DEV] Bypassing MSG91 — phone: ${verifiedPhone}`);
+  } else {
+    // Validate accessToken with MSG91, get back verified phone number
+    verifiedPhone = await this.otpService.verifyMsg91AccessToken(accessToken);
   }
+
+  // From here — identical to your existing logic
+  const { user, isNew } = await this.usersService.findOrCreate(
+    verifiedPhone,
+    preferredLanguage,
+  );
+  await this.usersService.updateLastLogin(user.id);
+  const tokens = await this.issueTokens(user, deviceInfo, ip);
+  const admins = this.config.get<string[]>('admin.numbers') ?? [];
+  const isAdmin = admins.includes(verifiedPhone);
+
+  return { ...tokens, user, isNewUser: isNew, isAdmin };
+}
 
   async refreshTokens(rawToken: string, deviceInfo?: string, ip?: string) {
     const record = await this.refreshRepo.findOne({

@@ -1,14 +1,19 @@
-import { IsString, Matches, Length, IsIn, IsOptional } from 'class-validator';
+import { IsString, Matches, Length, IsIn, IsOptional, IsNotEmpty } from 'class-validator';
 
 export class VerifyOtpDto {
-  @IsString()
-  @Matches(/^\+[1-9]\d{9,14}$/)
-  phone: string;
 
   @IsString()
-  @Length(6, 6)
-  @Matches(/^\d{6}$/, { message: 'OTP must be 6 numeric digits' })
-  otp: string;
+  @IsNotEmpty()
+  accessToken: string;
+
+  // @IsString()
+  // @Matches(/^\+[1-9]\d{9,14}$/)
+  // phone: string;
+
+  // @IsString()
+  // @Length(6, 6)
+  // @Matches(/^\d{6}$/, { message: 'OTP must be 6 numeric digits' })
+  // otp: string;
 
   @IsString()
   @IsOptional()
