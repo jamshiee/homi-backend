@@ -88,6 +88,9 @@ async verifyOtp(
     verifiedPhone = await this.otpService.verifyMsg91AccessToken(accessToken);
   }
 
+  // add + to verified phone, as msg91 returns number without +
+  verifiedPhone = `+${verifiedPhone}`;
+
   // From here — identical to your existing logic
   const { user, isNew } = await this.usersService.findOrCreate(
     verifiedPhone,
