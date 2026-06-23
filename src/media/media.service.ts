@@ -7,11 +7,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as path from 'path';
-import * as fs from 'fs';
 import sharp from 'sharp';
 import { Media, MediaEntityType } from './entities/media.entity';
 import { PropertyMedia } from './entities/property-media.entity';
 import { Property } from '../properties/entities/property.entity';
+import { Inject } from '@nestjs/common';
+import * as storageProviderInterface from './providers/storage.provider.interface';
 
 @Injectable()
 export class MediaService {
@@ -21,7 +22,8 @@ export class MediaService {
     private readonly pmRepo: Repository<PropertyMedia>,
     @InjectRepository(Property)
     private readonly propertyRepo: Repository<Property>,
-    private readonly config: ConfigService,
+    @Inject(storageProviderInterface.STORAGE_PROVIDER)
+    private readonly storageProvider: storageProviderInterface.IStorageProvider,
   ) {}
 
   async uploadPropertyPhoto(
@@ -112,23 +114,23 @@ export class MediaService {
             fit: 'inside',
             withoutEnlargement: true,
           })
-          .jpeg({ quality: 80, progressive: true });
+          .webp({ quality: 80, effort: 4 }); // Convert to WebP
 
         buffer = await pipeline.toBuffer();
-        mimeType = 'image/jpeg';
+        mimeType = 'image/webp';
 
         const ext = path.extname(file.originalname);
         const nameWithoutExt = file.originalname.slice(
           0,
           -ext.length || file.originalname.length,
         );
-        filename = `${nameWithoutExt}.jpg`;
+        filename = `${nameWithoutExt}.webp`;
       } catch (err) {
         // Fallback to original
       }
     }
 
-    const url = await this.saveLocally(buffer, filename);
+    const url = await this.storageProvider.uploadFile(buffer, filename, mimeType);
     return this.mediaRepo.save({
       entityType,
       entityId,
@@ -137,16 +139,5 @@ export class MediaService {
       fileSizeBytes: buffer.length,
       originalFilename: file.originalname,
     });
-  }
-
-  private async saveLocally(
-    buffer: Buffer,
-    originalFilename: string,
-  ): Promise<string> {
-    const dir = path.join(process.cwd(), 'uploads');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    const filename = `${Date.now()}-${originalFilename.replace(/\s/g, '_')}`;
-    fs.writeFileSync(path.join(dir, filename), buffer);
-    return `${this.config.get<string>('storage.baseUrl')}/${filename}`;
   }
 }

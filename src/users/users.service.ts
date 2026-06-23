@@ -1,14 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { User } from './users.entity';
+import { PropertiesService } from '../properties/properties.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User) private readonly repo: Repository<User>,
     private readonly config: ConfigService,
+    @Inject(forwardRef(() => PropertiesService))
+    private readonly propertiesService: PropertiesService,
   ) {}
 
   async findOrCreate(
@@ -65,5 +68,29 @@ export class UsersService {
 
   isAdmin(phone: string): boolean {
     return (this.config.get<string[]>('admin.numbers') || []).includes(phone);
+  }
+
+  async deleteAccount(id: string): Promise<void> {
+    const user = await this.repo.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Find and delete all properties listed by this user
+    // We fetch them without pagination because we want to delete all.
+    // The findByUser from properties service uses pagination, so let's just 
+    // fetch their IDs from the user's properties directly if we want, or use the service to get all.
+    const userProperties = await this.propertiesService.findByUser(id, { page: 1, limit: 1000 });
+    
+    for (const property of userProperties.data) {
+      await this.propertiesService.remove(property.id, id);
+    }
+
+    // Append timestamp to phone number to free it up for re-registration
+    const deletedPhone = `${user.phone}_deleted_${Date.now()}`;
+    await this.repo.update(id, { phone: deletedPhone, isActive: false });
+
+    // Soft delete the user
+    await this.repo.softRemove(user);
   }
 }

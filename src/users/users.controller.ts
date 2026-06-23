@@ -1,4 +1,4 @@
-import { Controller, Patch, Body, UseGuards } from '@nestjs/common';
+import { Controller, Patch, Delete, Body, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { User } from './users.entity';
@@ -21,6 +21,14 @@ export class UsersController {
         profileMediaId: updated.profileMediaId,
       },
       message: 'Profile updated',
+    };
+  }
+
+  @Delete('me')
+  async deleteAccount(@CurrentUser() user: User) {
+    await this.usersService.deleteAccount(user.id);
+    return {
+      message: 'Account deleted successfully',
     };
   }
 }

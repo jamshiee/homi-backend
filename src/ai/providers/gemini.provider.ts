@@ -5,8 +5,7 @@ import { AiProvider } from './ai-provider.interface';
 import { HOMI_SYSTEM_PROMPT } from '../prompts/system.prompt';
 
 const GEMINI_API_BASE =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
 @Injectable()
 export class GeminiProvider implements AiProvider {
   private readonly logger = new Logger(GeminiProvider.name);
