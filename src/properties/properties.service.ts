@@ -87,6 +87,19 @@ export class PropertiesService {
     return results.map((r) => r.district);
   }
 
+  async getDistinctLocalities(district?: string): Promise<string[]> {
+    const qb = this.propertyRepo
+      .createQueryBuilder('p')
+      .select('DISTINCT(p.locality)', 'locality')
+      .where('p.status = :s', { s: PropertyStatus.ACTIVE })
+      .andWhere('p.deletedAt IS NULL')
+      .andWhere('p.locality IS NOT NULL AND p.locality != :empty', { empty: '' });
+    if (district)
+      qb.andWhere('p.district = :district', { district });
+    const results = await qb.orderBy('locality', 'ASC').getRawMany();
+    return results.map((r) => r.locality);
+  }
+
   async findFeed(filters: FilterPropertyDto, userId?: string | null) {
     const { page, limit, skip } = paginate(filters);
     const qb = this.propertyRepo
@@ -106,6 +119,18 @@ export class PropertiesService {
       .addOrderBy('p.featuredOrder', 'ASC')
       .addOrderBy('p.createdAt', 'DESC');
 
+    // Apply sort override when explicitly requested
+    if (filters.sort === 'price_asc') {
+      qb.orderBy('p.price', 'ASC');
+    } else if (filters.sort === 'price_desc') {
+      qb.orderBy('p.price', 'DESC');
+    } else if (filters.sort === 'relevance') {
+      qb.orderBy('p.isFeatured', 'DESC')
+        .addOrderBy('p.viewCount', 'DESC')
+        .addOrderBy('p.createdAt', 'DESC');
+    }
+    // Default (newest) already set above
+
     if (filters.type) qb.andWhere('p.type = :type', { type: filters.type });
     if (
       filters.transactionType &&
@@ -114,6 +139,8 @@ export class PropertiesService {
       qb.andWhere('p.transactionType = :tt', { tt: filters.transactionType });
     if (filters.district)
       qb.andWhere('p.district = :district', { district: filters.district });
+    if (filters.locality)
+      qb.andWhere('p.locality ILIKE :locality', { locality: `%${filters.locality}%` });
 
     if (filters.keyword) {
       qb.andWhere(

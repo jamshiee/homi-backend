@@ -57,6 +57,15 @@ export class PropertiesController {
     };
   }
 
+  @Public()
+  @Get('locations/localities')
+  async getLocationsLocalities(@Query('district') district?: string) {
+    return {
+      data: await this.svc.getDistinctLocalities(district),
+      message: 'Active localities fetched',
+    };
+  }
+
   // ==========================================
   // ADMIN FEATURED PROPERTIES MODULE ENDPOINTS
   // ==========================================

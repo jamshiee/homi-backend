@@ -18,6 +18,10 @@ export class FilterPropertyDto {
   district?: string;
 
   @IsOptional()
+  @IsString()
+  locality?: string;
+
+  @IsOptional()
   @IsEnum(PropertyStatus)
   status?: PropertyStatus;
 
@@ -89,4 +93,8 @@ export class FilterPropertyDto {
   @IsOptional()
   @IsString()
   roomType?: string;
+
+  @IsOptional()
+  @IsString()
+  sort?: string;
 }
