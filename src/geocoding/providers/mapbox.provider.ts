@@ -125,6 +125,7 @@ export class MapboxProvider implements IGeocodingProvider {
       );
 
       const feature = response.data?.features?.[0];
+      console.log("mapbox reverse geocode response",JSON.stringify(response.data.features[0],null,2));
       if (!feature) return null;
 
       const ctx = feature.properties?.context ?? {};

@@ -228,17 +228,52 @@ export class PropertiesService {
     return { data, meta: paginationMeta(total, page, limit) };
   }
 
-  async findFeatured(userId?: string | null) {
-    const items = await this.propertyRepo.find({
-      where: {
-        status: PropertyStatus.ACTIVE,
-        isFeatured: true,
-        deletedAt: IsNull(),
-      },
-      order: { featuredOrder: 'ASC', createdAt: 'DESC' },
-      take: 10,
-      relations: ['propertyMedia', 'propertyMedia.media', 'lister', 'lister.profileMedia'],
-    });
+  async findFeatured(
+    userId?: string | null,
+    district?: string,
+    locality?: string,
+  ) {
+    // When no location filter is requested, use the fast .find() path
+    if (!district && !locality) {
+      const items = await this.propertyRepo.find({
+        where: {
+          status: PropertyStatus.ACTIVE,
+          isFeatured: true,
+          deletedAt: IsNull(),
+        },
+        order: { featuredOrder: 'ASC', createdAt: 'DESC' },
+        take: 10,
+        relations: [
+          'propertyMedia',
+          'propertyMedia.media',
+          'lister',
+          'lister.profileMedia',
+        ],
+      });
+      const savedSet = await this.getSavedSet(items.map((p) => p.id), userId);
+      return this.annotateWithSaved(items, savedSet);
+    }
+
+    // Location-filtered path
+    const qb = this.propertyRepo
+      .createQueryBuilder('p')
+      .where('p.status = :s', { s: PropertyStatus.ACTIVE })
+      .andWhere('p.isFeatured = true')
+      .andWhere('p.deletedAt IS NULL')
+      .leftJoinAndSelect('p.propertyMedia', 'pm')
+      .leftJoinAndSelect('pm.media', 'm')
+      .leftJoinAndSelect('p.lister', 'lister')
+      .leftJoinAndSelect('lister.profileMedia', 'listerMedia')
+      .orderBy('p.featuredOrder', 'ASC')
+      .addOrderBy('p.createdAt', 'DESC')
+      .take(10);
+
+    if (district)
+      qb.andWhere('p.district = :district', { district });
+    if (locality)
+      qb.andWhere('p.locality = :locality', { locality });
+
+    const items = await qb.getMany();
     const savedSet = await this.getSavedSet(items.map((p) => p.id), userId);
     return this.annotateWithSaved(items, savedSet);
   }

@@ -91,9 +91,13 @@ export class PropertiesController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get('featured')
-  async getFeatured(@CurrentUser() user: User | null) {
+  async getFeatured(
+    @CurrentUser() user: User | null,
+    @Query('district') district?: string,
+    @Query('locality') locality?: string,
+  ) {
     return {
-      data: await this.svc.findFeatured(user?.id ?? null),
+      data: await this.svc.findFeatured(user?.id ?? null, district, locality),
       message: 'Featured properties',
     };
   }
