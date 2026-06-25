@@ -446,6 +446,7 @@ export class PropertiesService {
           roomType: dto.hotelDetail.roomType,
           occupancy: dto.hotelDetail.occupancy,
           mealsIncluded: dto.hotelDetail.mealsIncluded,
+          hotelCategory: dto.hotelDetail.hotelCategory,
         });
         await manager.save(HotelDetail, hotel);
       }
@@ -894,6 +895,7 @@ export class PropertiesService {
       roomType: detail.roomType,
       occupancy: detail.occupancy,
       mealsIncluded: detail.mealsIncluded,
+      hotelCategory: detail.hotelCategory,
     };
 
     if (existing) {
