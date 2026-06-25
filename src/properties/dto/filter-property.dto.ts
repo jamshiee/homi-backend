@@ -2,7 +2,6 @@ import { IsOptional, IsEnum, IsString, IsInt, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PropertyType, TransactionType, PropertyStatus, ModerationStatus } from '../entities/property.entity';
 import { FurnishingStatusEnum } from '../entities/house-detail.entity';
-import { HotelCategoryEnum } from '../entities/hotel-detail.entity';
 import { Transform } from 'class-transformer';
 
 export class FilterPropertyDto {
@@ -100,8 +99,8 @@ export class FilterPropertyDto {
   hotelSubtype?: string;
 
   @IsOptional()
-  @IsEnum(HotelCategoryEnum)
-  hotelCategory?: HotelCategoryEnum;
+  @IsString()
+  hotelCategory?: string;
 
   @IsOptional()
   @IsString()
