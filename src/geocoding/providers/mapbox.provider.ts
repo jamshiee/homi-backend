@@ -73,10 +73,7 @@ export class MapboxProvider implements IGeocodingProvider {
         if (!region.toLowerCase().includes('kerala')) continue;
 
         const locality =
-          ctx.neighborhood?.name ||
-          ctx.locality?.name ||
-          ctx.place?.name ||
-          '';
+          ctx.neighborhood?.name || ctx.locality?.name || ctx.place?.name || '';
 
         const rawDistrict = ctx.district?.name || ctx.place?.name || '';
 
@@ -96,7 +93,10 @@ export class MapboxProvider implements IGeocodingProvider {
 
       return results;
     } catch (error) {
-      this.logger.error(`Mapbox forward geocode failed: "${query}"`, error.message);
+      this.logger.error(
+        `Mapbox forward geocode failed: "${query}"`,
+        error.message,
+      );
       return [];
     }
   }
@@ -106,7 +106,10 @@ export class MapboxProvider implements IGeocodingProvider {
 
     const cacheKey = `rev_${lat.toFixed(5)}_${lon.toFixed(5)}`;
     const cached = this.cache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) return cached.data[0] || null;
+    if (cached && cached.expiresAt > Date.now()) {
+      console.log('cached mapbox reverse geocode response', JSON.stringify(cached.data[0],null,2));
+      return cached.data[0] || null;
+    }
 
     try {
       this.logger.log(`Mapbox reverse geocode: [${lat}, ${lon}]`);
@@ -125,16 +128,16 @@ export class MapboxProvider implements IGeocodingProvider {
       );
 
       const feature = response.data?.features?.[0];
-      console.log("mapbox reverse geocode response",JSON.stringify(response.data.features[0],null,2));
+      console.log(
+        'mapbox reverse geocode response',
+        JSON.stringify(response.data.features[0], null, 2),
+      );
       if (!feature) return null;
 
       const ctx = feature.properties?.context ?? {};
 
       const locality =
-        ctx.neighborhood?.name ||
-        ctx.locality?.name ||
-        ctx.place?.name ||
-        '';
+        ctx.neighborhood?.name || ctx.locality?.name || ctx.place?.name || '';
 
       const rawDistrict = ctx.district?.name || ctx.place?.name || '';
 
