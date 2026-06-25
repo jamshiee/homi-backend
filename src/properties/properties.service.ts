@@ -196,10 +196,22 @@ export class PropertiesService {
     }
 
     if (filters.type === PropertyType.HOTEL) {
+      if (filters.hotelSubtype) {
+        qb.leftJoin('p.hotelDetail', 'hotd');
+        qb.andWhere('hotd.subType = :hotelSubtype', {
+          hotelSubtype: filters.hotelSubtype,
+        });
+      }
       if (filters.roomType) {
         qb.leftJoin('p.hotelDetail', 'hotd');
         qb.andWhere('hotd.roomType = :roomType', {
           roomType: filters.roomType,
+        });
+      }
+      if (filters.hotelCategory) {
+        qb.leftJoin('p.hotelDetail', 'hotd');
+        qb.andWhere('hotd.hotelCategory = :hotelCategory', {
+          hotelCategory: filters.hotelCategory,
         });
       }
     }

@@ -23,6 +23,12 @@ export enum RoomTypeEnum {
   FAMILY = "family"
 }
 
+export enum HotelCategoryEnum {
+  LUXURY = "luxury",
+  PREMIUM = "premium",
+  CLASSIC = "classic"
+}
+
 
 @Entity('hotel_detail')
 export class HotelDetail {
@@ -57,7 +63,13 @@ export class HotelDetail {
   @Column({ name: 'meals_included', default: false })
   mealsIncluded: boolean;
 
-  
+  @Column({
+    name: 'hotel_category',
+    type: 'enum',
+    enum: HotelCategoryEnum,
+    nullable: true
+  })
+  hotelCategory: HotelCategoryEnum | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

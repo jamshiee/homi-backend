@@ -13,7 +13,7 @@ import { Type } from 'class-transformer';
 import { PropertyType, TransactionType, PriceUnit } from '../entities/property.entity';
 import { FurnishingStatusEnum } from '../entities/house-detail.entity';
 import { AreaUnitEnum, BuildingStatusEnum, BuildingSubTypeEnum } from '../entities/building-detail.entity';
-import { HotelSubTypeEnum, RoomTypeEnum } from '../entities/hotel-detail.entity';
+import { HotelSubTypeEnum, RoomTypeEnum, HotelCategoryEnum } from '../entities/hotel-detail.entity';
 
 export class LandDetailDto {
   @IsNotEmpty()
@@ -96,6 +96,10 @@ export class HotelDetailDto {
   @IsNotEmpty()
   @IsBoolean()
   mealsIncluded: boolean;
+
+  @IsOptional()
+  @IsEnum(HotelCategoryEnum)
+  hotelCategory?: HotelCategoryEnum;
 
 }
 

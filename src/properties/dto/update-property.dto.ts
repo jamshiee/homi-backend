@@ -24,6 +24,7 @@ import {
 import {
   HotelSubTypeEnum,
   RoomTypeEnum,
+  HotelCategoryEnum,
 } from '../entities/hotel-detail.entity';
 
 class UpdateLandDetailDto {
@@ -106,6 +107,10 @@ class UpdateHotelDetailDto {
   @IsOptional()
   @IsBoolean()
   mealsIncluded?: boolean;
+
+  @IsOptional()
+  @IsEnum(HotelCategoryEnum)
+  hotelCategory?: HotelCategoryEnum;
 }
 
 export class UpdatePropertyMediaSyncDto {
