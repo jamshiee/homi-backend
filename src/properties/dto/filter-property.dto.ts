@@ -6,8 +6,14 @@ import { Transform } from 'class-transformer';
 
 export class FilterPropertyDto {
   @IsOptional()
-  @IsEnum(PropertyType)
-  type?: PropertyType;
+  @Transform(({ value }) => {
+    if (!value) return undefined;
+    if (Array.isArray(value)) return value;
+    if (value === 'all') return undefined; // special frontend case
+    return value.split(',');
+  })
+  @IsEnum(PropertyType, { each: true })
+  type?: PropertyType[];
 
   @IsOptional()
   @IsEnum(TransactionType)

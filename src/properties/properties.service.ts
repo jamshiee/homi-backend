@@ -165,7 +165,9 @@ export class PropertiesService {
       applyBaseSort();
     }
 
-    if (filters.type) qb.andWhere('p.type = :type', { type: filters.type });
+    if (filters.type && filters.type.length > 0) {
+      qb.andWhere('p.type IN (:...types)', { types: filters.type });
+    }
     if (
       filters.transactionType &&
       filters.transactionType !== TransactionType.ALL
@@ -191,7 +193,7 @@ export class PropertiesService {
     if (filters.maxPrice !== undefined)
       qb.andWhere('p.price <= :maxPrice', { maxPrice: filters.maxPrice });
 
-    if (filters.type === PropertyType.HOUSE) {
+    if (filters.type?.includes(PropertyType.HOUSE)) {
       if (filters.bedrooms || filters.bathrooms || filters.furnishingStatus) {
         qb.leftJoin('p.houseDetail', 'hd');
         if (filters.bedrooms)
@@ -209,7 +211,7 @@ export class PropertiesService {
       }
     }
 
-    if (filters.type === PropertyType.LAND) {
+    if (filters.type?.includes(PropertyType.LAND)) {
       if (filters.minArea || filters.maxArea || filters.areaUnit) {
         qb.leftJoin('p.landDetail', 'ld');
         if (filters.minArea)
@@ -223,7 +225,7 @@ export class PropertiesService {
       }
     }
 
-    if (filters.type === PropertyType.BUILDING) {
+    if (filters.type?.includes(PropertyType.BUILDING)) {
       if (filters.buildingSubtype) {
         qb.leftJoin('p.buildingDetail', 'bd');
         qb.andWhere('bd.propertySubtype = :subtype', {
@@ -232,7 +234,7 @@ export class PropertiesService {
       }
     }
 
-    if (filters.type === PropertyType.HOTEL) {
+    if (filters.type?.includes(PropertyType.HOTEL)) {
       if (filters.hotelSubtype || filters.roomType || filters.hotelCategory) {
         qb.leftJoin('p.hotelDetail', 'hotd');
         if (filters.hotelSubtype) {
@@ -360,7 +362,9 @@ export class PropertiesService {
       .leftJoinAndSelect('p.lister', 'lister')
       .orderBy('p.createdAt', 'DESC');
 
-    if (filters.type) qb.andWhere('p.type = :type', { type: filters.type });
+    if (filters.type && filters.type.length > 0) {
+      qb.andWhere('p.type IN (:...types)', { types: filters.type });
+    }
     if (filters.status) qb.andWhere('p.status = :status', { status: filters.status });
     if (filters.moderationStatus) qb.andWhere('p.moderationStatus = :ms', { ms: filters.moderationStatus });
     if (filters.isFeatured !== undefined) qb.andWhere('p.isFeatured = :feat', { feat: filters.isFeatured });
