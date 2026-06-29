@@ -114,33 +114,70 @@ export class PropertiesService {
       .leftJoinAndSelect('p.hotelDetail', 'hotel')
       .leftJoinAndSelect('p.lister', 'lister')
       .leftJoinAndSelect('lister.profileMedia', 'listerMedia')
-      .leftJoinAndSelect('pm.media', 'm')
-      .orderBy('p.isFeatured', 'DESC')
-      .addOrderBy('p.featuredOrder', 'ASC')
-      .addOrderBy('p.createdAt', 'DESC');
+      .leftJoinAndSelect('pm.media', 'm');
+
+    const hasLocalityAndDistrict = filters.locality && filters.district;
+
+    if (hasLocalityAndDistrict) {
+      qb.addSelect(
+        `CASE WHEN p.locality ILIKE :locMatch THEN 0 ELSE 1 END`,
+        'locality_priority',
+      );
+      qb.setParameter('locMatch', `%${filters.locality}%`);
+    }
+
+    const applyBaseSort = () => {
+      if (hasLocalityAndDistrict) {
+        qb.orderBy('locality_priority', 'ASC');
+        qb.addOrderBy('p.isFeatured', 'DESC');
+      } else {
+        qb.orderBy('p.isFeatured', 'DESC');
+      }
+      qb.addOrderBy('p.featuredOrder', 'ASC');
+      qb.addOrderBy('p.createdAt', 'DESC');
+    };
 
     // Apply sort override when explicitly requested
     if (filters.sort === 'price_asc') {
-      qb.orderBy('p.price', 'ASC');
+      if (hasLocalityAndDistrict) {
+        qb.orderBy('locality_priority', 'ASC').addOrderBy('p.price', 'ASC');
+      } else {
+        qb.orderBy('p.price', 'ASC');
+      }
     } else if (filters.sort === 'price_desc') {
-      qb.orderBy('p.price', 'DESC');
+      if (hasLocalityAndDistrict) {
+        qb.orderBy('locality_priority', 'ASC').addOrderBy('p.price', 'DESC');
+      } else {
+        qb.orderBy('p.price', 'DESC');
+      }
     } else if (filters.sort === 'relevance') {
-      qb.orderBy('p.isFeatured', 'DESC')
-        .addOrderBy('p.viewCount', 'DESC')
-        .addOrderBy('p.createdAt', 'DESC');
+      if (hasLocalityAndDistrict) {
+        qb.orderBy('locality_priority', 'ASC')
+          .addOrderBy('p.isFeatured', 'DESC')
+          .addOrderBy('p.viewCount', 'DESC')
+          .addOrderBy('p.createdAt', 'DESC');
+      } else {
+        qb.orderBy('p.isFeatured', 'DESC')
+          .addOrderBy('p.viewCount', 'DESC')
+          .addOrderBy('p.createdAt', 'DESC');
+      }
+    } else {
+      applyBaseSort();
     }
-    // Default (newest) already set above
 
     if (filters.type) qb.andWhere('p.type = :type', { type: filters.type });
     if (
       filters.transactionType &&
       filters.transactionType !== TransactionType.ALL
-    )
+    ) {
       qb.andWhere('p.transactionType = :tt', { tt: filters.transactionType });
-    if (filters.district)
+    }
+    
+    if (filters.district) {
       qb.andWhere('p.district = :district', { district: filters.district });
-    if (filters.locality)
+    } else if (filters.locality) {
       qb.andWhere('p.locality ILIKE :locality', { locality: `%${filters.locality}%` });
+    }
 
     if (filters.keyword) {
       qb.andWhere(
@@ -275,17 +312,29 @@ export class PropertiesService {
       .leftJoinAndSelect('p.propertyMedia', 'pm')
       .leftJoinAndSelect('pm.media', 'm')
       .leftJoinAndSelect('p.lister', 'lister')
-      .leftJoinAndSelect('lister.profileMedia', 'listerMedia')
-      .orderBy('p.featuredOrder', 'ASC')
-      .addOrderBy('p.createdAt', 'DESC')
-      .take(10);
+      .leftJoinAndSelect('lister.profileMedia', 'listerMedia');
 
-    if (district)
+    if (district && locality) {
+      qb.addSelect(
+        `CASE WHEN p.locality = :locMatch THEN 0 ELSE 1 END`,
+        'locality_priority'
+      );
+      qb.setParameter('locMatch', locality);
+      qb.orderBy('locality_priority', 'ASC');
+      qb.addOrderBy('p.featuredOrder', 'ASC');
+      qb.addOrderBy('p.createdAt', 'DESC');
       qb.andWhere('p.district = :district', { district });
-    if (locality)
-      qb.andWhere('p.locality = :locality', { locality });
+    } else {
+      qb.orderBy('p.featuredOrder', 'ASC');
+      qb.addOrderBy('p.createdAt', 'DESC');
+      
+      if (district)
+        qb.andWhere('p.district = :district', { district });
+      else if (locality)
+        qb.andWhere('p.locality = :locality', { locality });
+    }
 
-    const items = await qb.getMany();
+    const items = await qb.take(10).getMany();
     const savedSet = await this.getSavedSet(items.map((p) => p.id), userId);
     return this.annotateWithSaved(items, savedSet);
   }
