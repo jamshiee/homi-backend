@@ -45,4 +45,10 @@ export default () => ({
     provider: process.env.AI_PROVIDER || 'gemini',
     geminiApiKey: process.env.GEMINI_API_KEY,
   },
+  moderation: {
+    // When true, editing an APPROVED property sends it back to PENDING for re-review
+    reApproveOnEdit: process.env.MODERATION_REAPPROVE_ON_EDIT !== 'false',
+    // Max times a user can re-submit a REJECTED property. 0 = unlimited
+    maxAppeals: parseInt(process.env.MODERATION_MAX_APPEALS ?? '3', 10) || 3,
+  },
 });

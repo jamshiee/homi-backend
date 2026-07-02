@@ -23,12 +23,23 @@ import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { FilterPropertyDto } from './dto/filter-property.dto';
+import { ModeratePropertyDto } from './dto/moderate-property.dto';
 import { EnquiryType } from '../enquiry-logs/enquiry-log.entity';
 import { PropertyStatus } from './entities/property.entity';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('properties')
 export class PropertiesController {
-  constructor(private readonly svc: PropertiesService) {}
+  constructor(
+    private readonly svc: PropertiesService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private isAdminUser(user: User | null): boolean {
+    if (!user) return false;
+    const admins = this.config.get<string[]>('admin.numbers') ?? [];
+    return admins.includes(user.phone);
+  }
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get()
@@ -102,17 +113,23 @@ export class PropertiesController {
     };
   }
 
-  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
-  async getById(@Param('id') id: string) {
-    return { data: await this.svc.findById(id), message: 'Property fetched' };
+  async getById(
+    @Param('id') id: string,
+    @CurrentUser() user: User | null,
+  ) {
+    return {
+      data: await this.svc.findById(id, user?.id ?? undefined, this.isAdminUser(user)),
+      message: 'Property fetched',
+    };
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard)
   async create(@Body() dto: CreatePropertyDto, @CurrentUser() user: User) {
     return {
-      data: await this.svc.create(dto, user.id),
+      data: await this.svc.create(dto, user),
       message: 'Property created',
     };
   }
@@ -125,7 +142,7 @@ export class PropertiesController {
     @CurrentUser() user: User,
   ) {
     return {
-      data: await this.svc.update(id, dto, user.id),
+      data: await this.svc.update(id, dto, user),
       message: 'Property updated',
     };
   }
@@ -139,6 +156,18 @@ export class PropertiesController {
     return {
       data: await this.svc.setStatus(id, status),
       message: 'Status updated',
+    };
+  }
+
+  @Patch(':id/moderate')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async moderate(
+    @Param('id') id: string,
+    @Body() dto: ModeratePropertyDto,
+  ) {
+    return {
+      data: await this.svc.moderate(id, dto.status, dto.rejectionReason),
+      message: `Property ${dto.status}`,
     };
   }
 

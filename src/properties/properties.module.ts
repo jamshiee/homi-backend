@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule } from '@nestjs/config';
 import { Property } from './entities/property.entity';
 import { LandDetail } from './entities/land-detail.entity';
 import { HouseDetail } from './entities/house-detail.entity';
@@ -12,6 +13,7 @@ import { PropertiesController } from './properties.controller';
 
 @Module({
   imports: [
+    ConfigModule,
     TypeOrmModule.forFeature([
       Property,
       LandDetail,

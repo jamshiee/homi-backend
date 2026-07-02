@@ -8,11 +8,13 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import {
   Property,
   PropertyStatus,
   PropertyType,
   TransactionType,
+  ModerationStatus,
 } from './entities/property.entity';
 import { FilterPropertyDto } from './dto/filter-property.dto';
 import { EnquiryLog, EnquiryType } from '../enquiry-logs/enquiry-log.entity';
@@ -30,6 +32,7 @@ import { PropertyAmenity } from '../amenities/property-amenity.entity';
 import { PropertyMedia } from '../media/entities/property-media.entity';
 import { Media } from '../media/entities/media.entity';
 import { SavedProperty } from '../saved-properties/saved-property.entity';
+import { User } from '../users/users.entity';
 
 @Injectable()
 export class PropertiesService {
@@ -42,6 +45,7 @@ export class PropertiesService {
     private readonly enquiryRepo: Repository<EnquiryLog>,
     @InjectRepository(SavedProperty)
     private readonly savedRepo: Repository<SavedProperty>,
+    private readonly config: ConfigService,
   ) {}
 
   /**
@@ -77,6 +81,7 @@ export class PropertiesService {
       .createQueryBuilder('p')
       .select('DISTINCT(p.district)', 'district')
       .where('p.status = :s', { s: PropertyStatus.ACTIVE })
+      .andWhere('p.moderationStatus = :ms', { ms: ModerationStatus.APPROVED })
       .andWhere('p.deletedAt IS NULL')
       .andWhere('p.district IS NOT NULL AND p.district != :empty', {
         empty: '',
@@ -92,6 +97,7 @@ export class PropertiesService {
       .createQueryBuilder('p')
       .select('DISTINCT(p.locality)', 'locality')
       .where('p.status = :s', { s: PropertyStatus.ACTIVE })
+      .andWhere('p.moderationStatus = :ms', { ms: ModerationStatus.APPROVED })
       .andWhere('p.deletedAt IS NULL')
       .andWhere('p.locality IS NOT NULL AND p.locality != :empty', { empty: '' });
     if (district)
@@ -105,6 +111,7 @@ export class PropertiesService {
     const qb = this.propertyRepo
       .createQueryBuilder('p')
       .where('p.status = :s', { s: PropertyStatus.ACTIVE })
+      .andWhere('p.moderationStatus = :ms', { ms: ModerationStatus.APPROVED })
       .andWhere('p.deletedAt IS NULL')
       .andWhere('(p.featuredUntil IS NULL OR p.featuredUntil > NOW())')
       .leftJoinAndSelect('p.propertyMedia', 'pm')
@@ -289,6 +296,7 @@ export class PropertiesService {
       const items = await this.propertyRepo.find({
         where: {
           status: PropertyStatus.ACTIVE,
+          moderationStatus: ModerationStatus.APPROVED,
           isFeatured: true,
           deletedAt: IsNull(),
         },
@@ -309,6 +317,7 @@ export class PropertiesService {
     const qb = this.propertyRepo
       .createQueryBuilder('p')
       .where('p.status = :s', { s: PropertyStatus.ACTIVE })
+      .andWhere('p.moderationStatus = :ms', { ms: ModerationStatus.APPROVED })
       .andWhere('p.isFeatured = true')
       .andWhere('p.deletedAt IS NULL')
       .leftJoinAndSelect('p.propertyMedia', 'pm')
@@ -389,7 +398,7 @@ export class PropertiesService {
     return { data, meta: paginationMeta(total, page, limit) };
   }
 
-  async findById(id: string) {
+  async findById(id: string, requestingUserId?: string, isAdmin = false) {
     const p = await this.propertyRepo.findOne({
       where: { id, deletedAt: IsNull() },
       relations: [
@@ -406,10 +415,19 @@ export class PropertiesService {
       ],
     });
     if (!p) throw new NotFoundException('Property not found.');
+
+    // Block non-approved properties from public view
+    if (p.moderationStatus !== ModerationStatus.APPROVED) {
+      const isOwner = requestingUserId && p.listedByUserId === requestingUserId;
+      if (!isOwner && !isAdmin) {
+        throw new NotFoundException('Property not found.');
+      }
+    }
+
     return p;
   }
 
-  async create(dto: CreatePropertyDto, listerId: string) {
+  async create(dto: CreatePropertyDto, lister: User) {
     if (
       dto.type === PropertyType.HOTEL &&
       dto.transactionType !== TransactionType.RENT
@@ -421,6 +439,13 @@ export class PropertiesService {
     if (dto.price <= 0) {
       throw new BadRequestException('Price must be greater than zero.');
     }
+
+    const adminNumbers = this.config.get<string[]>('admin.numbers') || [];
+    const isAdmin = adminNumbers.includes(lister.phone);
+    // Admins bypass moderation; regular users start as PENDING
+    const moderationStatus = isAdmin
+      ? ModerationStatus.APPROVED
+      : ModerationStatus.PENDING;
 
     return this.propertyRepo.manager.transaction(async (manager) => {
       const property = manager.create(Property, {
@@ -440,8 +465,9 @@ export class PropertiesService {
         description: dto.description,
         contactPhone: dto.contactPhone,
         alternatePhone: dto.alternatePhone,
-        listedByUserId: listerId,
+        listedByUserId: lister.id,
         status: PropertyStatus.ACTIVE,
+        moderationStatus,
       });
 
       const baseSlug = dto.title
@@ -518,11 +544,41 @@ export class PropertiesService {
     });
   }
 
-  async update(id: string, dto: UpdatePropertyDto, userId: string) {
-    const property = await this.assertPropertyOwner(id, userId);
+  async update(id: string, dto: UpdatePropertyDto, editor: User) {
+    const property = await this.assertPropertyOwner(id, editor.id);
 
     if ('type' in dto && dto.type !== undefined && dto.type !== property.type) {
       throw new BadRequestException('Property type cannot be changed.');
+    }
+
+    const adminNumbers = this.config.get<string[]>('admin.numbers') || [];
+    const isAdmin = adminNumbers.includes(editor.phone);
+    const reApproveOnEdit = this.config.get<boolean>('moderation.reApproveOnEdit') ?? true;
+    const maxAppeals = this.config.get<number>('moderation.maxAppeals') ?? 3;
+
+    // Determine new moderation status after edit
+    let newModerationStatus: ModerationStatus | undefined;
+    let newAppealCount: number | undefined;
+    let newRejectionReason: string | null | undefined;
+
+    if (!isAdmin) {
+      if (property.moderationStatus === ModerationStatus.REJECTED) {
+        // Check appeal limit
+        if (maxAppeals > 0 && property.appealCount >= maxAppeals) {
+          throw new BadRequestException(
+            `Maximum resubmissions (${maxAppeals}) reached. Please contact support.`,
+          );
+        }
+        newModerationStatus = ModerationStatus.PENDING;
+        newAppealCount = property.appealCount + 1;
+        newRejectionReason = null; // clear rejection reason on resubmit
+      } else if (
+        property.moderationStatus === ModerationStatus.APPROVED &&
+        reApproveOnEdit
+      ) {
+        newModerationStatus = ModerationStatus.PENDING;
+        newRejectionReason = null;
+      }
     }
 
     return this.propertyRepo.manager.transaction(async (manager) => {
@@ -549,6 +605,14 @@ export class PropertiesService {
         coreUpdate.contactPhone = dto.contactPhone;
       if (dto.alternatePhone !== undefined)
         coreUpdate.alternatePhone = dto.alternatePhone;
+
+      // Apply moderation state changes
+      if (newModerationStatus !== undefined)
+        coreUpdate.moderationStatus = newModerationStatus;
+      if (newAppealCount !== undefined)
+        coreUpdate.appealCount = newAppealCount;
+      if (newRejectionReason !== undefined)
+        (coreUpdate as any).rejectionReason = newRejectionReason;
 
       if (Object.keys(coreUpdate).length > 0) {
         await manager.update(Property, { id }, coreUpdate);
@@ -586,6 +650,21 @@ export class PropertiesService {
   async setStatus(id: string, status: PropertyStatus) {
     await this.propertyRepo.update(id, { status });
     return this.findById(id);
+  }
+
+  async moderate(
+    id: string,
+    status: ModerationStatus.APPROVED | ModerationStatus.REJECTED,
+    rejectionReason?: string,
+  ) {
+    const update: Partial<Property> = { moderationStatus: status };
+    if (status === ModerationStatus.APPROVED) {
+      update.rejectionReason = null;
+    } else {
+      update.rejectionReason = rejectionReason ?? null;
+    }
+    await this.propertyRepo.update(id, update as any);
+    return this.findById(id,undefined,true);
   }
 
   async setFeatured(
@@ -777,6 +856,7 @@ export class PropertiesService {
     return this.propertyRepo
       .createQueryBuilder('p')
       .where('p.status = :s', { s: PropertyStatus.ACTIVE })
+      .andWhere('p.moderationStatus = :ms', { ms: ModerationStatus.APPROVED })
       .andWhere('p.deletedAt IS NULL')
       .andWhere('p.id != :id', { id })
       .andWhere('p.district = :district', { district })

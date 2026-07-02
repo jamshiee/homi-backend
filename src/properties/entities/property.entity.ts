@@ -142,6 +142,12 @@ export class Property {
   })
   moderationStatus: ModerationStatus;
 
+  @Column({ name: 'rejection_reason', nullable: true, type: 'text' })
+  rejectionReason: string | null;
+
+  @Column({ name: 'appeal_count', default: 0 })
+  appealCount: number;
+
   @Column({ name: 'is_featured', default: false })
   isFeatured: boolean;
 
