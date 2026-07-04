@@ -190,7 +190,7 @@ export class PropertiesService {
 
     if (filters.keyword) {
       qb.andWhere(
-        '(p.locality ILIKE :kw OR p.district ILIKE :kw OR p.title ILIKE :kw OR p.description ILIKE :kw)',
+        '(p.locality ILIKE :kw OR p.district ILIKE :kw OR p.title ILIKE :kw OR p.description ILIKE :kw OR p.serialNo ILIKE :kw)',
         { kw: `%${filters.keyword}%` },
       );
     }
@@ -377,6 +377,7 @@ export class PropertiesService {
     if (filters.status) qb.andWhere('p.status = :status', { status: filters.status });
     if (filters.moderationStatus) qb.andWhere('p.moderationStatus = :ms', { ms: filters.moderationStatus });
     if (filters.isFeatured !== undefined) qb.andWhere('p.isFeatured = :feat', { feat: filters.isFeatured });
+    if (filters.serialNo) qb.andWhere('p.serialNo = :serialNo', { serialNo: filters.serialNo.toUpperCase() });
     if (
       filters.transactionType &&
       filters.transactionType !== TransactionType.ALL
@@ -388,7 +389,7 @@ export class PropertiesService {
     }
     if (filters.keyword) {
       qb.andWhere(
-        '(p.locality ILIKE :kw OR p.district ILIKE :kw OR p.title ILIKE :kw OR p.description ILIKE :kw)',
+        '(p.locality ILIKE :kw OR p.district ILIKE :kw OR p.title ILIKE :kw OR p.description ILIKE :kw OR p.serialNo ILIKE :kw)',
         { kw: `%${filters.keyword}%` },
       );
     }
@@ -448,7 +449,23 @@ export class PropertiesService {
       : ModerationStatus.PENDING;
 
     return this.propertyRepo.manager.transaction(async (manager) => {
+      // Advisory lock prevents concurrent transactions from picking the same
+      // serial number. Lock key 9876543 is arbitrary but unique to this operation.
+      await manager.query(`SELECT pg_advisory_xact_lock(9876543)`);
+
+      // Derive next serial number: find current MAX numeric suffix, start at 5000
+      const result = await manager.query(
+        `SELECT serial_no FROM property WHERE serial_no IS NOT NULL ORDER BY serial_no DESC LIMIT 1`,
+      );
+      let nextNum = 5001;
+      if (result.length > 0) {
+        const lastSerial: string = result[0].serial_no;
+        const lastNum = parseInt(lastSerial.replace('HH', ''), 10);
+        if (!isNaN(lastNum)) nextNum = lastNum + 1;
+      }
+      const serialNo = `HH${nextNum}`;
       const property = manager.create(Property, {
+        serialNo,
         title: dto.title,
         type: dto.type,
         transactionType: dto.transactionType,

@@ -111,4 +111,8 @@ export class FilterPropertyDto {
   @IsOptional()
   @IsString()
   sort?: string;
+
+  @IsOptional()
+  @IsString()
+  serialNo?: string;
 }

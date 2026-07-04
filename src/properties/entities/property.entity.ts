@@ -62,6 +62,9 @@ export class Property {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ name: 'serial_no', nullable: true, unique: true, length: 20 })
+  serialNo: string;
+
   @Column({ name: 'title', length: 255, nullable: true })
   title: string;
 
