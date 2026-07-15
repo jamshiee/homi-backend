@@ -438,6 +438,31 @@ export class PropertiesService {
     return p;
   }
 
+  async findPublicById(id: string) {
+    const p = await this.propertyRepo.findOne({
+      where: { id, deletedAt: IsNull(), moderationStatus: ModerationStatus.APPROVED },
+      relations: [
+        'landDetail',
+        'houseDetail',
+        'buildingDetail',
+        'hotelDetail',
+        'propertyAmenities',
+        'propertyAmenities.amenity',
+        'propertyMedia',
+        'propertyMedia.media',
+      ],
+    });
+    if (!p) throw new NotFoundException('Property not found.');
+
+    // Remove sensitive information for public web view
+    delete (p as any).contactPhone;
+    delete (p as any).alternatePhone;
+    delete (p as any).listedByUserId;
+    delete (p as any).lister;
+
+    return p;
+  }
+
   async create(dto: CreatePropertyDto, lister: User) {
     if (
       dto.type === PropertyType.HOTEL &&

@@ -115,6 +115,16 @@ export class PropertiesController {
     };
   }
 
+  @Public()
+  @Get(':id/public')
+  async getPublicById(@Param('id') id: string) {
+    return {
+      data: await this.svc.findPublicById(id),
+      message: 'Public property fetched',
+    };
+  }
+
+  @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
   async getById(
