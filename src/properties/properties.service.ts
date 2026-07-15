@@ -307,6 +307,10 @@ export class PropertiesService {
           'propertyMedia.media',
           'lister',
           'lister.profileMedia',
+          'hotelDetail',
+          'buildingDetail',
+          'landDetail',
+          'houseDetail',
         ],
       });
       const savedSet = await this.getSavedSet(items.map((p) => p.id), userId);
@@ -369,7 +373,13 @@ export class PropertiesService {
       .leftJoinAndSelect('p.propertyMedia', 'pm')
       .leftJoinAndSelect('pm.media', 'm')
       .leftJoinAndSelect('p.lister', 'lister')
-      .orderBy('p.createdAt', 'DESC');
+      .addSelect(
+        "CASE WHEN p.moderationStatus = 'approved' THEN 1 WHEN p.moderationStatus = 'pending' THEN 2 ELSE 3 END",
+        'moderation_order',
+      )
+      .orderBy('moderation_order', 'ASC')
+      .addOrderBy('p.district', 'ASC')
+      .addOrderBy('p.createdAt', 'DESC');
 
     if (filters.type && filters.type.length > 0) {
       qb.andWhere('p.type IN (:...types)', { types: filters.type });

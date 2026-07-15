@@ -41,6 +41,7 @@ export class PropertiesController {
     return admins.includes(user.phone);
   }
 
+  @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @Get()
   getFeed(
@@ -100,6 +101,7 @@ export class PropertiesController {
   // PUBLIC & USER ENDPOINTS
   // ==========================================
 
+  @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @Get('featured')
   async getFeatured(
