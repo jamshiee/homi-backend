@@ -435,7 +435,8 @@ export class PropertiesService {
       }
     }
 
-    return p;
+    const savedSet = await this.getSavedSet([p.id], requestingUserId);
+    return this.annotateWithSaved([p], savedSet)[0];
   }
 
   async findPublicById(id: string) {

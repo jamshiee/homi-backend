@@ -86,8 +86,9 @@ export class UsersService {
       await this.propertiesService.remove(property.id, id);
     }
 
-    // Append timestamp to phone number to free it up for re-registration
-    const deletedPhone = `${user.phone}_deleted_${Date.now()}`;
+    // Replace phone with a unique string to free it up for re-registration and fit in varchar(20)
+    const uniqueSuffix = Math.random().toString(36).substring(2, 6);
+    const deletedPhone = `DEL_${Date.now().toString(36)}_${uniqueSuffix}`;
     await this.repo.update(id, { phone: deletedPhone, isActive: false });
 
     // Soft delete the user
