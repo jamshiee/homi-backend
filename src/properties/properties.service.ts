@@ -45,6 +45,8 @@ export class PropertiesService {
     private readonly enquiryRepo: Repository<EnquiryLog>,
     @InjectRepository(SavedProperty)
     private readonly savedRepo: Repository<SavedProperty>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly config: ConfigService,
   ) {}
 
@@ -967,9 +969,14 @@ export class PropertiesService {
     });
 
     if (!property) throw new NotFoundException('Property not found.');
-    if (property.listedByUserId !== userId) {
+
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+
+    const admins = this.config.get<string[]>('admin.numbers') ?? [];
+    const isAdmin = user ? admins.includes(user.phone) : false;
+    if (property.listedByUserId !== userId && !isAdmin) {
       throw new ForbiddenException(
-        'Only listing owner can edit this property.',
+        'Only listing owner or admin can edit this property.',
       );
     }
 

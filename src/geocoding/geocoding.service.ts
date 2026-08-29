@@ -9,8 +9,8 @@ import { MapboxProvider } from './providers/mapbox.provider';
  * GeocodingService is a thin facade that delegates to the active provider.
  *
  * Provider is selected by the GEOCODING_PROVIDER environment variable:
- *   - "nominatim" (default) — free, rate-limited, good for development
- *   - "mapbox"              — production-ready, requires MAPBOX_ACCESS_TOKEN
+ *   - "mapbox"   (default)  — production-ready, requires MAPBOX_ACCESS_TOKEN
+ *   - "nominatim"  — free, rate-limited, good for development
  */
 @Injectable()
 export class GeocodingService {
