@@ -10,6 +10,7 @@ import { EnquiryLog } from '../enquiry-logs/enquiry-log.entity';
 import { SavedProperty } from '../saved-properties/saved-property.entity';
 import { PropertiesService } from './properties.service';
 import { PropertiesController } from './properties.controller';
+import { User } from 'src/users/users.entity';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PropertiesController } from './properties.controller';
       HotelDetail,
       EnquiryLog,
       SavedProperty,
+      User,
     ]),
   ],
   providers: [PropertiesService],
